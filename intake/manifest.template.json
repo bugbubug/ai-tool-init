@@ -1,24 +1,61 @@
 {
-  "version": 1,
-  "targetProjectPath": "/absolute/path/to/target-project",
-  "requestedOperation": "auto",
-  "profile": "default",
-  "providerRoots": {
-    "ecc": "/absolute/path/to/everything-claude-code"
+  "schemaVersion": 2,
+  "target": {
+    "projectPath": "/absolute/path/to/target-project",
+    "requestedOperation": "auto",
+    "profile": "default"
   },
-  "documents": [],
-  "requestedTeamSkills": [],
-  "requestedProjectSkills": [],
-  "projectSkillBlueprints": [],
-  "extraAgents": [
-    "explorer",
-    "reviewer"
+  "providers": [
+    {
+      "providerId": "ecc",
+      "rootPath": "/absolute/path/to/everything-claude-code",
+      "requestedSkills": [
+        "coding-standards",
+        "tdd-workflow",
+        "verification-loop"
+      ]
+    }
   ],
-  "compatPlugin": true,
-  "agentDecisions": [],
+  "documents": [
+    {
+      "id": "doc-1",
+      "path": "docs/requirements.md",
+      "label": "Project Requirements",
+      "kind": "requirements",
+      "appliesTo": "project"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "stack-1",
+      "summary": "Use Bun + TypeScript strict for project baseline.",
+      "appliesTo": "project",
+      "sourcePaths": [
+        "docs/requirements.md"
+      ]
+    },
+    {
+      "id": "git-1",
+      "summary": "Use branch-per-change workflow with review before merge.",
+      "appliesTo": "project",
+      "sourcePaths": [
+        "docs/requirements.md"
+      ]
+    }
+  ],
+  "project": {
+    "requestedProjectSkills": [
+      "repo-governance"
+    ],
+    "projectSkillBlueprints": [],
+    "extraAgents": [
+      "explorer",
+      "reviewer"
+    ]
+  },
   "notes": [
-    "Copy this file to intake/manifest.json and replace with run-specific intake data before execution.",
-    "For stack guidance, persist final stack rationale using stack-* naming in decision summaries (migrated to v2 decisions ids) and capture constraints in notes.",
-    "For Git guidance, persist workflow rationale using git-* naming in decision summaries (migrated to v2 decisions ids) and capture branch/CI/release constraints in notes."
+    "Copy this file to intake/manifest.json and replace placeholders with run-specific input.",
+    "Use schemaVersion=2 only. Legacy version=1 manifests are not supported.",
+    "Use absolute paths for provider roots and target project path."
   ]
 }

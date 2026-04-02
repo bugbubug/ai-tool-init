@@ -9,5 +9,10 @@ Recommended examples:
 - workflow docs
 - team skill indexes
 
-After copying documents here, record them in `../manifest.json` before running `seli`.
+After copying documents here, record them in `../manifest.json` (schemaVersion `2`) before running `seli`.
 Create it from `../manifest.template.json` when needed.
+
+Recommended manifest fields to keep in sync with this folder:
+
+- `documents[].path`
+- `decisions[].sourcePaths`

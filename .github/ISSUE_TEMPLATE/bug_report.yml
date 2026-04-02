@@ -1,0 +1,58 @@
+name: Bug report
+description: Report a reproducible bug in Seli
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please provide enough detail for maintainers to reproduce.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: One-sentence description of the problem
+      placeholder: seli init fails when intake uses schemaVersion 2
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Exact commands and files needed to reproduce
+      placeholder: |
+        1. Run ...
+        2. Create ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Runtime and platform details
+      placeholder: |
+        - OS:
+        - Bun version:
+        - Node version (if relevant):
+        - Seli version/commit:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      description: Paste relevant output (remove secrets)
+      render: shell

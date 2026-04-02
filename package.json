@@ -2,7 +2,7 @@
   "name": "seli",
   "version": "1.0.0",
   "description": "Seli: AI Coding's First Step.",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "module": "./src/index.ts",

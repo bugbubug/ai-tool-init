@@ -4,6 +4,21 @@ node_modules/
 # Local runtime files
 *.log
 *.tmp
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build and cache artifacts
+dist/
+build/
+coverage/
+.cache/
+.turbo/
+.next/
 
 # Intake workspace (local, machine-specific input)
 intake/manifest.json
