@@ -34,10 +34,10 @@ export function createSymlinkEntry(pathRelativeToProject: string, target: string
 
 export function renderAgentsContractV2(config: SeliConfigV2, resolvedProviders: ResolvedProviderV2[]): string {
   const teamProviders = resolvedProviders.map(provider => {
-    return `- \`${provider.id}\` -> \`${provider.resolvedSourceRoot || '(unresolved)'}\` (${provider.packages.length} package(s))`;
+    return `- \`${provider.id}\` (${provider.packages.length} package(s); source root stored in local config)`;
   });
   const teamPackages = resolvedProviders.flatMap(provider =>
-    provider.packages.map(pkg => `- \`${provider.id}/${pkg.label}\` -> \`${pkg.resolvedRoot}\``)
+    provider.packages.map(pkg => `- \`${provider.id}/${pkg.label}\` -> \`(provider-local root)\``)
   );
 
   const teamSkills = config.layers.team.providers.flatMap(provider => provider.skills.map(skill => `- \`${skill}\``));

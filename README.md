@@ -22,7 +22,7 @@ Seli 面向“已有仓库或新仓库的 AI 协作治理”场景，提供 `pla
 - 状态确定性：通过 `.seli.lock` 记录 pipeline 指纹、provider 包快照与 managed 条目。
 - 漂移检测：默认在执行前校验 managed 文件/软链接漂移，降低误覆盖风险。
 - 双平台基线：可生成 Codex 与 Claude 的仓库内协作入口与技能映射。
-- 兼容本地团队技能包：支持 `SELI_ECC_ROOT` 与 `--provider-root` 覆盖来源。
+- 兼容本地团队技能包：支持 `--provider-root <provider>=<abs-path>` 覆盖来源（当前内置 provider 为 `ecc`，环境变量为 `SELI_ECC_ROOT`）。
 
 ## 适用场景 / Use Cases
 
@@ -67,6 +67,14 @@ npm install -g seli
 ```bash
 seli init \
   --project /absolute/path/to/your-project \
+  --provider-root <provider>=<abs-path>
+```
+
+示例（当前内置 provider `ecc`）：
+
+```bash
+seli init \
+  --project /absolute/path/to/your-project \
   --provider-root ecc=/absolute/path/to/everything-claude-code
 ```
 
@@ -104,10 +112,10 @@ Seli 的状态合同：
 
 provider root 解析优先级（高到低）：
 
-1. `--provider-root ecc=/abs/path`
+1. `--provider-root <provider>=<abs-path>`（例如 `--provider-root ecc=/abs/path`）
 2. intake `providers[].rootPath` / `providers[].teamPackages[]`
 3. 已持久化 `.selirc`
-4. 环境变量 `SELI_ECC_ROOT`
+4. provider 对应环境变量（例如 `ecc` 对应 `SELI_ECC_ROOT`）
 5. catalog 默认候选路径
 
 intake 仅支持 v2（示例见 `intake/manifest.template.json`）：
@@ -206,7 +214,7 @@ It focuses on repository collaboration state management, not business feature im
 - Deterministic state with pipeline fingerprint and managed-entry snapshots
 - Managed drift checks before apply (unless forced)
 - Repository-local Codex/Claude collaboration entrypoints
-- Local team package integration via `--provider-root` or `SELI_ECC_ROOT`
+- Local team package integration via `--provider-root <provider>=<abs-path>` (for built-in `ecc`, env var is `SELI_ECC_ROOT`)
 
 ### Use Cases
 
@@ -229,6 +237,12 @@ See the structure section above (`项目结构 / Project Structure`).
 
 ```bash
 npm install -g seli
+seli init --project /absolute/path/to/your-project --provider-root <provider>=<abs-path>
+```
+
+Example with the current built-in provider:
+
+```bash
 seli init --project /absolute/path/to/your-project --provider-root ecc=/absolute/path/to/everything-claude-code
 ```
 
@@ -245,7 +259,7 @@ bun run src/cli.ts help
 
 - State files: `.selirc`, `.seli.lock`
 - Intake schema: `schemaVersion: 2` only
-- Provider root precedence: CLI override > intake > persisted config > `SELI_ECC_ROOT` > catalog candidates
+- Provider root precedence: CLI override (`--provider-root <provider>=<abs-path>`) > intake > persisted config > provider env var (for `ecc`: `SELI_ECC_ROOT`) > catalog candidates
 
 ### Development
 

@@ -11,10 +11,10 @@ function bulletList(values: readonly string[]): string {
 
 export function renderAgentsContract(config: SeliConfig, resolvedConfig: ResolvedSeliConfig): string {
   const teamProviders = resolvedConfig.layers.team.providers.map(provider => {
-    return `- \`${provider.id}\` -> \`${provider.resolvedSourceRoot || '(unresolved)'}\` (${provider.packages.length} package(s))`;
+    return `- \`${provider.id}\` (${provider.packages.length} package(s); source root stored in local config)`;
   });
   const teamPackages = resolvedConfig.layers.team.providers.flatMap(provider =>
-    provider.packages.map(pkg => `- \`${provider.id}/${pkg.label}\` -> \`${pkg.resolvedRoot}\``)
+    provider.packages.map(pkg => `- \`${provider.id}/${pkg.label}\` -> \`(provider-local root)\``)
   );
 
   const teamSkills = config.layers.team.providers.flatMap(provider => provider.skills.map(skill => `- \`${skill}\``));

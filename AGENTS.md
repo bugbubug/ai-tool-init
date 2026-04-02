@@ -100,11 +100,11 @@ Effective priority:
 
 ## Enabled Team Providers
 
-- `ecc` -> `/Users/bugbubug/Desktop/ai-project/everything-claude-code` (1 package(s))
+- `ecc` (1 package(s); source root stored in local config)
 
 ## Resolved Team Packages
 
-- `ecc/everything-claude-code` -> `/Users/bugbubug/Desktop/ai-project/everything-claude-code`
+- `ecc/everything-claude-code` -> `(provider-local root)`
 
 ## Enabled Team Skills
 

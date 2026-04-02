@@ -118,6 +118,10 @@ test('init writes only .selirc/.seli.lock and no compat outputs', () => {
   expect(agentsContract).toContain('Target project absolute path.');
   expect(agentsContract).toContain('Your team skill package root path');
   expect(agentsContract).toContain('plan -> init/update -> doctor');
+  expect(agentsContract).toContain('source root stored in local config');
+  expect(agentsContract).toContain('(provider-local root)');
+  expect(agentsContract).not.toContain(eccRoot);
+  expect(agentsContract).not.toMatch(/\/Users\/|\/home\/|[A-Za-z]:\\/);
 });
 
 test('plan -> update remains idempotent', () => {

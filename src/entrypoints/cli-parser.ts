@@ -7,10 +7,10 @@ const TOP_LEVEL_COMMANDS = new Set(['plan', 'init', 'update', 'doctor', 'migrate
 export function usage(): string {
   return `
 Usage:
-  seli plan --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root ecc=/abs/path] [--json|--explain]
-  seli init --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root ecc=/abs/path] [--force] [--json|--explain]
-  seli update --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root ecc=/abs/path] [--force] [--json|--explain]
-  seli doctor --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root ecc=/abs/path] [--json|--explain]
+  seli plan --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--json|--explain]
+  seli init --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--force] [--json|--explain]
+  seli update --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--force] [--json|--explain]
+  seli doctor --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--json|--explain]
   seli migrate --project <abs-path> [--intake intake/manifest.json] [--json|--explain]
   seli providers list [--json|--explain]
   seli plugins list [--json|--explain]
