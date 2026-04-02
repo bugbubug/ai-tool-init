@@ -79,11 +79,16 @@ export const REQUIRED_PROJECT_SKILLS: ProjectSkillConfigV2[] = [
     workflow: [
       'Read AGENTS.md, .selirc, and .seli.lock before choosing new team skills.',
       'Review the current repository structure, uploaded docs, and configured team skill packages to identify capability gaps.',
+      'Locate seli from default installation paths first: $(npm prefix -g)/bin/seli, ~/.bun/bin/seli, /opt/homebrew/bin/seli, /usr/local/bin/seli (Windows npm global shim: %AppData%\\\\npm\\\\seli.cmd).',
+      'If seli is not found in defaults, fall back to the user-installed seli project path discovered from AGENTS.md, .selirc, or a user-provided absolute path, then run: cd <seli-project> && bun run src/cli.ts <plan|update|doctor> --project <target-abs-path>.',
+      'If seli is still unavailable, install it with npm install -g seli and verify with seli --help before continuing.',
       'Prepare intake changes for the new team skill selection, then run plan, update, and doctor.'
     ],
     guardrails: [
       'Add team skills incrementally based on current project evidence instead of enabling every available skill.',
-      'Prefer project-local skills when repository-specific guidance should override the team layer.'
+      'Prefer project-local skills when repository-specific guidance should override the team layer.',
+      'Do not assume seli is available in PATH.',
+      'Always use an explicit --project <abs-path> argument when running seli commands.'
     ]
   },
   {
@@ -96,11 +101,16 @@ export const REQUIRED_PROJECT_SKILLS: ProjectSkillConfigV2[] = [
     workflow: [
       'Compare the current package scan against .seli.lock to find added, removed, or changed team skills.',
       'Adjust the selected team skills when a package change affects the project capability set.',
+      'Locate seli from default installation paths first: $(npm prefix -g)/bin/seli, ~/.bun/bin/seli, /opt/homebrew/bin/seli, /usr/local/bin/seli (Windows npm global shim: %AppData%\\\\npm\\\\seli.cmd).',
+      'If seli is not found in defaults, fall back to the user-installed seli project path discovered from AGENTS.md, .selirc, or a user-provided absolute path, then run: cd <seli-project> && bun run src/cli.ts <plan|update|doctor> --project <target-abs-path>.',
+      'If seli is still unavailable, install it with npm install -g seli and verify with seli --help before continuing.',
       'Run plan, update, and doctor to refresh symlinks, lock fingerprints, and validation state.'
     ],
     guardrails: [
       'Treat lock drift as a signal to rescan package contents before changing team skill selections.',
-      'Do not edit mounted team skills inside the project; update the source package or rerun seli.'
+      'Do not edit mounted team skills inside the project; update the source package or rerun seli.',
+      'Do not assume seli is available in PATH.',
+      'Always use an explicit --project <abs-path> argument when running seli commands.'
     ]
   }
 ];

@@ -122,6 +122,21 @@ test('init writes only .selirc/.seli.lock and no compat outputs', () => {
   expect(agentsContract).toContain('(provider-local root)');
   expect(agentsContract).not.toContain(eccRoot);
   expect(agentsContract).not.toMatch(/\/Users\/|\/home\/|[A-Za-z]:\\/);
+
+  const evolutionSkill = fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'team-skill-evolution', 'SKILL.md'), 'utf8');
+  const syncSkill = fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'team-skill-sync', 'SKILL.md'), 'utf8');
+  for (const skillDoc of [evolutionSkill, syncSkill]) {
+    expect(skillDoc).toContain('$(npm prefix -g)/bin/seli');
+    expect(skillDoc).toContain('~/.bun/bin/seli');
+    expect(skillDoc).toContain('/opt/homebrew/bin/seli');
+    expect(skillDoc).toContain('/usr/local/bin/seli');
+    expect(skillDoc).toContain('%AppData%\\\\npm\\\\seli.cmd');
+    expect(skillDoc).toContain('bun run src/cli.ts <plan|update|doctor> --project <target-abs-path>');
+    expect(skillDoc).toContain('npm install -g seli');
+    expect(skillDoc).toContain('seli --help');
+    expect(skillDoc).toContain('Do not assume seli is available in PATH.');
+    expect(skillDoc).toContain('Always use an explicit --project <abs-path> argument when running seli commands.');
+  }
 });
 
 test('plan -> update remains idempotent', () => {
