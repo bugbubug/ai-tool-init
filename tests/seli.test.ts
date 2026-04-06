@@ -35,6 +35,11 @@ function readLock(projectRoot: string): SeliLockV2 {
   return readJson<SeliLockV2>(path.join(projectRoot, '.seli.lock'));
 }
 
+function writeText(filePath: string, content: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, content, 'utf8');
+}
+
 function createFakeSkillPackage(rootPath: string, skills: string[]): void {
   for (const skill of skills) {
     const skillPath = path.join(rootPath, 'skills', skill);
@@ -55,7 +60,10 @@ function createFakeEccSource(rootPath: string): void {
     'frontend-patterns',
     'python-patterns',
     'python-testing',
-    'database-migrations'
+    'database-migrations',
+    'design-system',
+    'browser-qa',
+    'article-writing'
   ]);
 }
 
@@ -153,7 +161,7 @@ test('init writes only .selirc/.seli.lock and no compat outputs', () => {
     expect(skillDoc).toContain('/opt/homebrew/bin/seli');
     expect(skillDoc).toContain('/usr/local/bin/seli');
     expect(skillDoc).toContain('%AppData%\\\\npm\\\\seli.cmd');
-    expect(skillDoc).toContain('bun run src/cli.ts <plan|update|doctor> --project <target-abs-path>');
+    expect(skillDoc).toContain('bun run src/cli.ts <plan|update|doctor> --project <target-abs-path> --scope team-skills');
     expect(skillDoc).toContain('npm install -g seli');
     expect(skillDoc).toContain('seli --help');
     expect(skillDoc).toContain('Do not assume seli is available in PATH.');
@@ -362,6 +370,373 @@ test('update normalizes .agents/skills and removes duplicate project-skill direc
   expect(doctorAfter.ok).toBe(true);
 });
 
+test('team-skills scope updates only team skill symlinks and state files', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-team-scope-');
+  const intakeRoot = makeTempDir('seli-team-scope-intake-');
+  createFakeEccSource(eccRoot);
+
+  const initialIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow'] }],
+    project: {
+      extraAgents: ['explorer', 'reviewer'],
+      projectSkillBlueprints: [
+        {
+          id: 'western-launch-funnel',
+          description: 'Protect launch funnel rules.',
+          whenToUse: ['When launch funnel changes are requested.']
+        }
+      ]
+    }
+  });
+  initProject({ projectRoot, intakePath: initialIntakePath });
+
+  const agentsBefore = fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8');
+  const claudeReadmeBefore = fs.readFileSync(path.join(projectRoot, '.claude', 'README.md'), 'utf8');
+  const codexSkillBefore = fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'team-skill-evolution', 'SKILL.md'), 'utf8');
+  const projectSkillBefore = fs.readFileSync(
+    path.join(projectRoot, '.codex', 'skills', 'western-launch-funnel', 'SKILL.md'),
+    'utf8'
+  );
+  const explorerBefore = fs.readFileSync(path.join(projectRoot, '.codex', 'agents', 'explorer.toml'), 'utf8');
+
+  const updatedIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow', 'security-review'] }],
+    project: {
+      extraAgents: [],
+      requestedProjectSkills: []
+    }
+  });
+
+  const result = updateProject({
+    projectRoot,
+    intakePath: updatedIntakePath,
+    scope: 'team-skills'
+  });
+
+  expect(result.plan.operations.map(operation => [operation.action, operation.path])).toEqual([
+    ['write-file', '.selirc'],
+    ['write-symlink', '.agents/skills/security-review'],
+    ['write-file', '.seli.lock']
+  ]);
+
+  expect(fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8')).toBe(agentsBefore);
+  expect(fs.readFileSync(path.join(projectRoot, '.claude', 'README.md'), 'utf8')).toBe(claudeReadmeBefore);
+  expect(fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'team-skill-evolution', 'SKILL.md'), 'utf8')).toBe(codexSkillBefore);
+  expect(fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'western-launch-funnel', 'SKILL.md'), 'utf8')).toBe(projectSkillBefore);
+  expect(fs.readFileSync(path.join(projectRoot, '.codex', 'agents', 'explorer.toml'), 'utf8')).toBe(explorerBefore);
+  expect(fs.lstatSync(path.join(projectRoot, '.agents', 'skills', 'security-review')).isSymbolicLink()).toBe(true);
+
+  const config = readConfig(projectRoot);
+  const lock = readLock(projectRoot);
+  expect(config.layers.team.providers[0]?.skills).toEqual(['tdd-workflow', 'security-review']);
+  expect(config.layers.project.extraAgents).toEqual(['explorer', 'reviewer']);
+  expect(config.layers.project.skills.some(skill => skill.id === 'western-launch-funnel')).toBe(true);
+  expect(lock.resolved.providers[0]?.skills).toEqual(expect.arrayContaining(['tdd-workflow', 'security-review']));
+  expect(lock.managed.some(entry => entry.path === 'AGENTS.md')).toBe(true);
+  expect(lock.managed.some(entry => entry.path === '.agents/skills/security-review')).toBe(true);
+});
+
+test('inspect config and plan explain rejected requested skills', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-rejected-skill-');
+  const intakeRoot = makeTempDir('seli-rejected-skill-intake-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  const intakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['design-system'] }]
+  });
+
+  const inspect = planProject({
+    projectRoot,
+    intakePath
+  });
+  expect(inspect.summary.selectionErrors).toEqual([
+    'requestedSkills contains design-system, but provider ecc disallows it via allowedSkills'
+  ]);
+
+  const inspectConfig = execFileSync(
+    process.execPath,
+    [path.join(import.meta.dir, '..', 'src', 'cli.ts'), 'inspect', 'config', '--project', projectRoot, '--intake', intakePath, '--json'],
+    {
+      cwd: path.join(import.meta.dir, '..'),
+      encoding: 'utf8'
+    }
+  );
+  const parsed = JSON.parse(inspectConfig) as {
+    resolvedProviders: Array<{
+      rejectedSkills: Array<{ skillId: string; reason: string }>;
+      requestedSkills: string[];
+      selectedSkills: string[];
+    }>;
+  };
+  expect(parsed.resolvedProviders[0]?.requestedSkills).toEqual(['design-system']);
+  expect(parsed.resolvedProviders[0]?.selectedSkills).toEqual([]);
+  expect(parsed.resolvedProviders[0]?.rejectedSkills).toEqual([
+    { skillId: 'design-system', reason: 'disallowed_by_provider' }
+  ]);
+
+  expect(() =>
+    updateProject({
+      projectRoot,
+      intakePath
+    })
+  ).toThrow(/provider ecc disallows it via allowedSkills/);
+
+  const doctorResult = runDoctor({
+    projectRoot,
+    intakePath
+  });
+  expect(doctorResult.ok).toBe(false);
+  expect(doctorResult.errors.join('\n')).toContain('requestedSkills contains design-system, but provider ecc disallows it via allowedSkills');
+});
+
+test('additionalAllowedSkills lets project opt into provider-blocked skills', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-additional-allowed-');
+  const intakeRoot = makeTempDir('seli-additional-allowed-intake-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  const intakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [
+      {
+        providerId: 'ecc',
+        rootPath: eccRoot,
+        requestedSkills: ['design-system', 'browser-qa'],
+        additionalAllowedSkills: ['design-system', 'browser-qa']
+      }
+    ]
+  });
+
+  const result = updateProject({
+    projectRoot,
+    intakePath,
+    scope: 'team-skills'
+  });
+
+  expect(result.plan.summary.selectionErrors).toEqual([]);
+  const config = readConfig(projectRoot);
+  expect(config.layers.team.providers[0]?.additionalAllowedSkills).toEqual(['design-system', 'browser-qa']);
+  expect(config.layers.team.providers[0]?.skills).toEqual(['design-system', 'browser-qa']);
+  expect(fs.lstatSync(path.join(projectRoot, '.agents', 'skills', 'design-system')).isSymbolicLink()).toBe(true);
+  expect(fs.lstatSync(path.join(projectRoot, '.agents', 'skills', 'browser-qa')).isSymbolicLink()).toBe(true);
+});
+
+test('missing requested skill reports missing_from_packages', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-missing-skill-');
+  const intakeRoot = makeTempDir('seli-missing-skill-intake-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  const intakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [
+      {
+        providerId: 'ecc',
+        rootPath: eccRoot,
+        requestedSkills: ['ghost-skill'],
+        additionalAllowedSkills: ['ghost-skill']
+      }
+    ]
+  });
+
+  const plan = planProject({ projectRoot, intakePath });
+  expect(plan.summary.selectionErrors).toEqual([
+    'requestedSkills contains ghost-skill, but provider ecc could not find it in resolved packages'
+  ]);
+  expect(() => updateProject({ projectRoot, intakePath })).toThrow(/could not find it in resolved packages/);
+});
+
+test('full update preserves custom-block content and local-file overrides', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-customization-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  const config = readConfig(projectRoot);
+  config.policies.managedCustomization = {
+    'AGENTS.md': 'custom-block',
+    '.codex/skills/change-closeout/SKILL.md': 'custom-block',
+    '.codex/skills/team-skill-sync/SKILL.md': 'local-file'
+  };
+  writeJson(path.join(projectRoot, '.selirc'), config);
+
+  writeText(
+    path.join(projectRoot, 'AGENTS.md'),
+    `${fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8')}\n\n<!-- seli:custom:start -->\nProject AGENTS note\n<!-- seli:custom:end -->\n`
+  );
+  writeText(
+    path.join(projectRoot, '.codex', 'skills', 'change-closeout', 'SKILL.md'),
+    `${fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'change-closeout', 'SKILL.md'), 'utf8')}\n\n<!-- seli:custom:start -->\nCustom closeout rule\n<!-- seli:custom:end -->\n`
+  );
+  writeText(
+    path.join(projectRoot, '.codex', 'skills', 'team-skill-sync', 'SKILL.md'),
+    '# local override\n'
+  );
+
+  const result = updateProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot },
+    force: true
+  });
+
+  expect(result.plan.operations.some(operation => operation.path === '.codex/skills/team-skill-sync/SKILL.md')).toBe(false);
+  expect(fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8')).toContain('Project AGENTS note');
+  expect(fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'change-closeout', 'SKILL.md'), 'utf8')).toContain(
+    'Custom closeout rule'
+  );
+  expect(fs.readFileSync(path.join(projectRoot, '.codex', 'skills', 'team-skill-sync', 'SKILL.md'), 'utf8')).toBe(
+    '# local override\n'
+  );
+
+  const doctorResult = runDoctor({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+  expect(doctorResult.ok).toBe(true);
+
+  const lock = readLock(projectRoot);
+  expect(lock.managed.some(entry => entry.path === '.codex/skills/team-skill-sync/SKILL.md')).toBe(false);
+  expect(lock.managedSummary?.project).toContain('.codex/skills/change-closeout/SKILL.md');
+  expect(lock.managedSummary?.system).toContain('AGENTS.md');
+});
+
+test('team-skills scope ignores non-team managed drift during update and doctor', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-team-drift-');
+  const intakeRoot = makeTempDir('seli-team-drift-intake-');
+  createFakeEccSource(eccRoot);
+
+  const initialIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow'] }]
+  });
+  initProject({ projectRoot, intakePath: initialIntakePath });
+
+  fs.writeFileSync(path.join(projectRoot, 'AGENTS.md'), '# drifted\n', 'utf8');
+  fs.writeFileSync(path.join(projectRoot, '.claude', 'README.md'), '# drifted claude\n', 'utf8');
+  fs.rmSync(path.join(projectRoot, '.claude', 'skills'));
+  fs.symlinkSync('../broken-target', path.join(projectRoot, '.claude', 'skills'));
+
+  const updatedIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow', 'security-review'] }]
+  });
+
+  expect(() =>
+    updateProject({
+      projectRoot,
+      intakePath: updatedIntakePath
+    })
+  ).toThrow(/Managed file drift detected/);
+
+  expect(() =>
+    updateProject({
+      projectRoot,
+      intakePath: updatedIntakePath,
+      scope: 'team-skills'
+    })
+  ).not.toThrow();
+
+  const doctorResult = runDoctor({
+    projectRoot,
+    intakePath: updatedIntakePath,
+    scope: 'team-skills'
+  });
+  expect(doctorResult.ok).toBe(true);
+
+  const fullDoctor = runDoctor({
+    projectRoot,
+    intakePath: updatedIntakePath
+  });
+  expect(fullDoctor.ok).toBe(false);
+  expect(fullDoctor.errors.join('\n')).toContain('Claude skill entrypoint mismatch');
+});
+
+test('team-skills scope doctor keeps team-layer checks', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const missingRoot = makeTempDir('seli-ecc-missing-');
+  const projectRoot = makeTempDir('seli-team-doctor-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  const duplicateDir = path.join(projectRoot, '.agents', 'skills', 'repo-governance');
+  fs.mkdirSync(duplicateDir, { recursive: true });
+  fs.writeFileSync(path.join(duplicateDir, 'SKILL.md'), '# duplicate\n', 'utf8');
+
+  const tddSkillLink = path.join(projectRoot, '.agents', 'skills', 'tdd-workflow');
+  fs.rmSync(tddSkillLink);
+
+  const providerRoot = path.join(missingRoot, 'deleted-root');
+  const doctorResult = runDoctor({
+    projectRoot,
+    providerRoots: { ecc: providerRoot },
+    scope: 'team-skills'
+  });
+
+  expect(doctorResult.ok).toBe(false);
+  expect(doctorResult.errors.join('\n')).toContain('Managed path missing: .agents/skills/tdd-workflow');
+  expect(doctorResult.errors.join('\n')).toContain('Provider source root missing for ecc');
+  expect(doctorResult.errors.join('\n')).toContain('Duplicate skill IDs found in both .codex/skills and .agents/skills');
+  expect(doctorResult.errors.join('\n')).not.toContain('Claude skill entrypoint mismatch');
+});
+
+test('team-skills scope requires onboarded project and cannot be used with init', () => {
+  const projectRoot = makeTempDir('seli-team-scope-bootstrap-');
+  const eccRoot = makeTempDir('seli-ecc-');
+  createFakeEccSource(eccRoot);
+
+  expect(() =>
+    planProject({
+      projectRoot,
+      providerRoots: { ecc: eccRoot },
+      scope: 'team-skills'
+    })
+  ).toThrow(/team-skills scope requires an existing seli-managed project/);
+
+  expect(() =>
+    initProject({
+      projectRoot,
+      providerRoots: { ecc: eccRoot },
+      scope: 'team-skills'
+    })
+  ).toThrow(/init does not support --scope team-skills/);
+});
+
 test('CLI providers/plugins/inspect reflect active plugin set (without compat renderer)', () => {
   const repoRoot = path.join(import.meta.dir, '..');
   const cliPath = path.join(repoRoot, 'src', 'cli.ts');
@@ -399,6 +774,48 @@ test('CLI providers/plugins/inspect reflect active plugin set (without compat re
   };
   expect(inspect.pluginResolutions.providers).toContain('ecc');
   expect(inspect.pipelineFingerprint.length).toBeGreaterThan(10);
+});
+
+test('CLI inspect plan supports --scope team-skills', () => {
+  const repoRoot = path.join(import.meta.dir, '..');
+  const cliPath = path.join(repoRoot, 'src', 'cli.ts');
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-cli-team-scope-');
+  const intakeRoot = makeTempDir('seli-cli-team-scope-intake-');
+  createFakeEccSource(eccRoot);
+
+  const initialIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow'] }]
+  });
+  initProject({ projectRoot, intakePath: initialIntakePath });
+
+  const updatedIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow', 'security-review'] }]
+  });
+
+  const inspectJson = execFileSync(
+    process.execPath,
+    [cliPath, 'inspect', 'plan', '--project', projectRoot, '--intake', updatedIntakePath, '--scope', 'team-skills', '--json'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8'
+    }
+  );
+
+  const inspect = JSON.parse(inspectJson) as {
+    scope: string;
+    operationPreview: Array<{ action: string; path: string }>;
+  };
+  expect(inspect.scope).toBe('team-skills');
+  expect(inspect.operationPreview).toEqual([
+    { action: 'write-file', path: '.selirc' },
+    { action: 'write-symlink', path: '.agents/skills/security-review' },
+    { action: 'write-file', path: '.seli.lock' }
+  ]);
 });
 
 test('CLI explain mode prints Seli banner and init status lines', () => {

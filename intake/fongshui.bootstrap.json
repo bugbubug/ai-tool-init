@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "target": {
+    "projectPath": "/Users/bugbubug/Desktop/ai-project/fongshui",
+    "requestedOperation": "auto",
+    "profile": "default"
+  },
+  "providers": [
+    {
+      "providerId": "ecc",
+      "rootPath": "/Users/bugbubug/Desktop/ai-project/everything-claude-code",
+      "requestedSkills": [
+        "coding-standards",
+        "tdd-workflow",
+        "verification-loop",
+        "bun-runtime",
+        "frontend-patterns",
+        "backend-patterns",
+        "api-design",
+        "security-review",
+        "product-lens",
+        "market-research",
+        "content-engine"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "stack-cloudflare-react-router",
+      "summary": "Use Bun + TypeScript strict + React Router v7 on Cloudflare Workers for the launch baseline.",
+      "appliesTo": "project"
+    },
+    {
+      "id": "git-main-default",
+      "summary": "Initialize the repository with main as the default branch and use branch-per-change after bootstrap.",
+      "appliesTo": "project"
+    },
+    {
+      "id": "product-guest-checkout",
+      "summary": "Launch with guest checkout, signed report access links, and no end-user account system in v1.",
+      "appliesTo": "project"
+    },
+    {
+      "id": "positioning-eastern-guidance",
+      "summary": "Position the product as AI-driven Eastern life guidance and self-reflection, not fortune telling or psychic prediction.",
+      "appliesTo": "project"
+    }
+  ],
+  "project": {
+    "projectSkillBlueprints": [
+      {
+        "id": "western-launch-funnel",
+        "description": "Guide the English-market growth funnel from free mini reading through paid full report and upsell.",
+        "whenToUse": [
+          "Use when landing pages, offer packaging, pricing, conversion steps, or upsell flow change.",
+          "Use when deciding what belongs in the launch funnel versus later subscription phases."
+        ],
+        "workflow": [
+          "Treat the launch loop as free mini reading -> preview paywall -> paid full report -> follow-up Q&A -> 90-day upsell.",
+          "Keep launch scope centered on the Core Personality + Next 90 Days report and defer subscription mechanics unless explicitly requested.",
+          "Prefer conversion clarity, short time-to-value, and low-friction guest checkout over community or account-system complexity."
+        ],
+        "guardrails": [
+          "Do not expand launch scope into broad spiritual marketplace features.",
+          "Do not frame the offer around guaranteed prediction, destiny claims, or fixed-fate language."
+        ],
+        "relatedTeamSkills": [
+          "product-lens",
+          "content-engine",
+          "market-research"
+        ],
+        "sourceDocumentLabels": [
+          "MVP PRD",
+          "Commercial Loop"
+        ]
+      },
+      {
+        "id": "spiritual-compliance-guardrails",
+        "description": "Keep copy, UX, and prompts aligned with AI disclosure and self-reflection positioning guardrails.",
+        "whenToUse": [
+          "Use when changing public copy, checkout wording, prompts, or report content policy.",
+          "Use when adding new pages, legal content, or region-specific risk handling."
+        ],
+        "workflow": [
+          "Require AI disclosure, entertainment and self-reflection disclaimers, and no medical, legal, or financial advice language on relevant user-facing flows.",
+          "Prefer terms such as pattern-based insight, timing guidance, and reflection prompts over fortune telling language.",
+          "Block or flag copy that implies guaranteed outcomes, removing bad luck, fixed destiny, or prohibited regulated advice."
+        ],
+        "guardrails": [
+          "Do not use public-facing claims that promise accuracy, guaranteed outcomes, or supernatural certainty.",
+          "Do not add high-risk features such as health diagnosis, face reading, or regulated decision-making."
+        ],
+        "relatedTeamSkills": [
+          "security-review",
+          "product-lens"
+        ],
+        "sourceDocumentLabels": [
+          "Compliance Guide",
+          "Prompt Spec"
+        ]
+      },
+      {
+        "id": "reading-generation-quality",
+        "description": "Keep generated reading quality stable through fixed structure, tone rules, and output validation.",
+        "whenToUse": [
+          "Use when changing prompts, schemas, preview/full report behavior, or follow-up question handling."
+        ],
+        "workflow": [
+          "Keep readings in a fixed seven-section structure: opening summary, strengths, recurring challenges, relationship style, work pattern, this season guidance, reflection prompts.",
+          "Separate preview and full-reading generation rules and validate that required sections, disclaimers, and tone constraints are present.",
+          "Bias toward grounded reflective coaching language with light mystical flavor, not therapy imitation or absolute prediction."
+        ],
+        "guardrails": [
+          "Do not allow prompt outputs that omit required disclaimers or banned phrase checks.",
+          "Do not let free-form LLM output define the product contract; schemas and validators remain the source of truth."
+        ],
+        "relatedTeamSkills": [
+          "api-design",
+          "coding-standards"
+        ],
+        "sourceDocumentLabels": [
+          "Prompt Spec",
+          "LLM Handoff"
+        ]
+      },
+      {
+        "id": "cloudflare-saas-topology",
+        "description": "Guide Cloudflare-first service boundaries, bindings, and deployment conventions for the SaaS starter.",
+        "whenToUse": [
+          "Use when editing runtime architecture, wrangler configuration, data bindings, or local dev and deploy commands."
+        ],
+        "workflow": [
+          "Keep the launch architecture Cloudflare-first with Workers, D1, KV, R2, Queues, Turnstile, Analytics Engine, and AI Gateway.",
+          "Use repo-local Wrangler configuration and generated types instead of relying on global CLI state or handwritten Env interfaces.",
+          "Defer Workflows and more complex platform features until a clear post-launch need exists."
+        ],
+        "guardrails": [
+          "Do not introduce external infrastructure for core runtime responsibilities unless a concrete blocker exists.",
+          "Do not hand-write binding types when Wrangler-generated types are available."
+        ],
+        "relatedTeamSkills": [
+          "backend-patterns",
+          "api-design",
+          "bun-runtime"
+        ],
+        "sourceDocumentLabels": [
+          "Architecture",
+          "Development Workflow"
+        ]
+      }
+    ],
+    "extraAgents": [
+      "explorer",
+      "reviewer"
+    ]
+  },
+  "notes": [
+    "Launch market defaults are US, UK, CA, and AU with English-only copy and USD pricing.",
+    "The v1 runtime should stay Cloudflare-first and only leave payment and llm providers as unfinished production adapters.",
+    "Use guest checkout and signed delivery links instead of end-user accounts for the launch version."
+  ]
+}

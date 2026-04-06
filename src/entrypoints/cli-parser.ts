@@ -7,15 +7,15 @@ const TOP_LEVEL_COMMANDS = new Set(['plan', 'init', 'update', 'doctor', 'migrate
 export function usage(): string {
   return `
 Usage:
-  seli plan --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--json|--explain]
-  seli init --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--force] [--json|--explain]
-  seli update --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--force] [--json|--explain]
-  seli doctor --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--json|--explain]
+  seli plan --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--scope full|team-skills] [--json|--explain]
+  seli init --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--scope full] [--force] [--json|--explain]
+  seli update --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--scope full|team-skills] [--force] [--json|--explain]
+  seli doctor --project <abs-path> [--profile default] [--intake intake/manifest.json] [--provider-root <provider>=<abs-path>] [--scope full|team-skills] [--json|--explain]
   seli migrate --project <abs-path> [--intake intake/manifest.json] [--json|--explain]
   seli providers list [--json|--explain]
   seli plugins list [--json|--explain]
-  seli inspect plan --project <abs-path> [--intake intake/manifest.json] [--json|--explain]
-  seli inspect config --project <abs-path> [--intake intake/manifest.json] [--json|--explain]
+  seli inspect plan --project <abs-path> [--intake intake/manifest.json] [--scope full|team-skills] [--json|--explain]
+  seli inspect config --project <abs-path> [--intake intake/manifest.json] [--scope full|team-skills] [--json|--explain]
 `;
 }
 
@@ -43,6 +43,7 @@ export function parseCliArgs(argv: string[]): ParsedCliOptionsV2 {
     intakePath: null,
     outputMode: 'explain',
     providerRoots: {},
+    scope: 'full',
     profileId: 'default',
     projectRoot: null
   };
@@ -79,6 +80,15 @@ export function parseCliArgs(argv: string[]): ParsedCliOptionsV2 {
       }
       const [providerId, providerRoot] = parseProviderRootArgument(value);
       parsed.providerRoots[providerId] = providerRoot;
+      index += 1;
+      continue;
+    }
+    if (arg === '--scope') {
+      const value = args[index + 1];
+      if (value !== 'full' && value !== 'team-skills') {
+        throw new Error(`Invalid --scope value: ${value || '(missing)'}. Expected full or team-skills.`);
+      }
+      parsed.scope = value;
       index += 1;
       continue;
     }

@@ -80,9 +80,9 @@ export const REQUIRED_PROJECT_SKILLS: ProjectSkillConfigV2[] = [
       'Read AGENTS.md, .selirc, and .seli.lock before choosing new team skills.',
       'Review the current repository structure, uploaded docs, and configured team skill packages to identify capability gaps.',
       'Locate seli from default installation paths first: $(npm prefix -g)/bin/seli, ~/.bun/bin/seli, /opt/homebrew/bin/seli, /usr/local/bin/seli (Windows npm global shim: %AppData%\\\\npm\\\\seli.cmd).',
-      'If seli is not found in defaults, fall back to the user-installed seli project path discovered from AGENTS.md, .selirc, or a user-provided absolute path, then run: cd <seli-project> && bun run src/cli.ts <plan|update|doctor> --project <target-abs-path>.',
+      'If seli is not found in defaults, fall back to the user-installed seli project path discovered from AGENTS.md, .selirc, or a user-provided absolute path, then run: cd <seli-project> && bun run src/cli.ts <plan|update|doctor> --project <target-abs-path> --scope team-skills.',
       'If seli is still unavailable, install it with npm install -g seli and verify with seli --help before continuing.',
-      'Prepare intake changes for the new team skill selection, then run plan, update, and doctor.'
+      'Prepare intake changes for the new team skill selection, then run plan, update, and doctor with --scope team-skills.'
     ],
     guardrails: [
       'Add team skills incrementally based on current project evidence instead of enabling every available skill.',
@@ -102,9 +102,9 @@ export const REQUIRED_PROJECT_SKILLS: ProjectSkillConfigV2[] = [
       'Compare the current package scan against .seli.lock to find added, removed, or changed team skills.',
       'Adjust the selected team skills when a package change affects the project capability set.',
       'Locate seli from default installation paths first: $(npm prefix -g)/bin/seli, ~/.bun/bin/seli, /opt/homebrew/bin/seli, /usr/local/bin/seli (Windows npm global shim: %AppData%\\\\npm\\\\seli.cmd).',
-      'If seli is not found in defaults, fall back to the user-installed seli project path discovered from AGENTS.md, .selirc, or a user-provided absolute path, then run: cd <seli-project> && bun run src/cli.ts <plan|update|doctor> --project <target-abs-path>.',
+      'If seli is not found in defaults, fall back to the user-installed seli project path discovered from AGENTS.md, .selirc, or a user-provided absolute path, then run: cd <seli-project> && bun run src/cli.ts <plan|update|doctor> --project <target-abs-path> --scope team-skills.',
       'If seli is still unavailable, install it with npm install -g seli and verify with seli --help before continuing.',
-      'Run plan, update, and doctor to refresh symlinks, lock fingerprints, and validation state.'
+      'Run plan, update, and doctor with --scope team-skills to refresh symlinks, lock fingerprints, and validation state.'
     ],
     guardrails: [
       'Treat lock drift as a signal to rescan package contents before changing team skill selections.',
@@ -128,7 +128,20 @@ function normalizeProvider(provider: TeamProviderConfigV2): TeamProviderConfigV2
     materializationMode: provider.materializationMode || 'symlink',
     sourceRoot: provider.sourceRoot ? path.resolve(provider.sourceRoot) : packages[0]?.rootPath,
     packages,
-    skills: uniqueStrings(provider.skills ?? [])
+    skills: uniqueStrings(provider.skills ?? []),
+    additionalAllowedSkills: uniqueStrings(provider.additionalAllowedSkills ?? [])
+  };
+}
+
+function defaultManagedCustomization(): Record<string, 'custom-block'> {
+  return {
+    'AGENTS.md': 'custom-block',
+    '.codex/skills/repo-governance/SKILL.md': 'custom-block',
+    '.codex/skills/change-closeout/SKILL.md': 'custom-block',
+    '.codex/skills/stack-bootstrap-guide/SKILL.md': 'custom-block',
+    '.codex/skills/git-management-guide/SKILL.md': 'custom-block',
+    '.codex/skills/team-skill-evolution/SKILL.md': 'custom-block',
+    '.codex/skills/team-skill-sync/SKILL.md': 'custom-block'
   };
 }
 
@@ -182,7 +195,8 @@ export function buildConfigFromProfileV2(profileId = 'default'): SeliConfigV2 {
           materializationMode: provider.materializationMode,
           sourceRoot: undefined,
           packages: [],
-          skills: [...provider.skills]
+          skills: [...provider.skills],
+          additionalAllowedSkills: []
         }))
       },
       project: {
@@ -198,7 +212,8 @@ export function buildConfigFromProfileV2(profileId = 'default'): SeliConfigV2 {
       overwriteManagedFiles: source.policies.overwriteManagedFiles,
       drift: source.policies.drift,
       symlink: source.policies.symlink,
-      compat: source.policies.compat
+      compat: source.policies.compat,
+      managedCustomization: defaultManagedCustomization()
     },
     plugins: {
       enabled: ['provider:ecc', 'renderer:base', 'renderer:codex', 'renderer:claude', 'policy:team-skill-selection', 'policy:drift-check', 'doctor:managed-state', 'doctor:provider-state', 'doctor:claude-entrypoint', 'doctor:duplicate-skills']
@@ -263,12 +278,17 @@ export function normalizeConfigV2(input: SeliConfigV2): SeliConfigV2 {
     overwriteManagedFiles: false,
     drift: 'error',
     symlink: 'relative',
-    compat: 'minimal'
+    compat: 'minimal',
+    managedCustomization: defaultManagedCustomization()
   };
   config.policies.overwriteManagedFiles = Boolean(config.policies.overwriteManagedFiles);
   config.policies.drift = config.policies.drift || 'error';
   config.policies.symlink = config.policies.symlink || 'relative';
   config.policies.compat = config.policies.compat || 'minimal';
+  config.policies.managedCustomization = {
+    ...defaultManagedCustomization(),
+    ...(config.policies.managedCustomization || {})
+  };
 
   config.plugins = config.plugins || { enabled: [] };
   config.plugins.enabled = uniqueStrings(config.plugins.enabled || []);

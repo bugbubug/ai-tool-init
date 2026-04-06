@@ -16,6 +16,7 @@ export const inspectConfigCommandModule: CommandModule = {
         profileId: args.profileId,
         intakePath: args.intakePath || undefined,
         providerRoots: args.providerRoots,
+        scope: args.scope,
         force: args.force,
         outputMode: args.outputMode
       },
@@ -28,7 +29,11 @@ export const inspectConfigCommandModule: CommandModule = {
         id: provider.id,
         resolvedSourceRoot: provider.resolvedSourceRoot,
         packageCount: provider.packages.length,
-        selectedSkills: provider.selectedSkills.map(skill => skill.skillId)
+        requestedSkills: provider.requestedSkillIds,
+        availableSkills: provider.availableSkillIds,
+        selectedSkills: provider.selectedSkills.map(skill => skill.skillId),
+        rejectedSkills: provider.rejectedSkillIds.map(item => ({ skillId: item.skillId, reason: item.reason })),
+        skillDecisions: provider.skillDecisions
       }))
     };
   }

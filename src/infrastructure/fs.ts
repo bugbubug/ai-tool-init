@@ -2,7 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { CurrentFingerprint, DesiredEntry, ManagedEntryV2 } from '../domain/contracts.js';
+import type { CurrentFingerprint, DesiredEntry, ManagedEntryV2, SeliConfigV2 } from '../domain/contracts.js';
+import { normalizeManagedFileContent } from '../domain/managed-customization.js';
 
 export function sha256(input: string | NodeJS.ArrayBufferView): string {
   return crypto.createHash('sha256').update(input).digest('hex');
@@ -61,7 +62,11 @@ export function readSymlinkIfExists(filePath: string): string | null {
   return null;
 }
 
-export function computeCurrentFingerprint(projectRoot: string, entry: Pick<ManagedEntryV2, 'path'>): CurrentFingerprint | null {
+export function computeCurrentFingerprint(
+  projectRoot: string,
+  entry: Pick<ManagedEntryV2, 'path'>,
+  config?: Pick<SeliConfigV2, 'policies'>
+): CurrentFingerprint | null {
   const absolutePath = path.join(projectRoot, entry.path);
   try {
     const stat = fs.lstatSync(absolutePath);
@@ -72,9 +77,10 @@ export function computeCurrentFingerprint(projectRoot: string, entry: Pick<Manag
       };
     }
     if (stat.isFile()) {
+      const content = fs.readFileSync(absolutePath, 'utf8');
       return {
         type: 'file',
-        sha256: sha256(fs.readFileSync(absolutePath))
+        sha256: sha256(config ? normalizeManagedFileContent(config, entry.path, content) : content)
       };
     }
     return { type: 'other' };
@@ -122,11 +128,14 @@ export function isInside(basePath: string, candidatePath: string): boolean {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-export function managedFingerprintFromDesired(entry: DesiredEntry): { type: 'file'; sha256: string } | { type: 'symlink'; symlinkTarget: string } {
+export function managedFingerprintFromDesired(
+  entry: DesiredEntry,
+  config?: Pick<SeliConfigV2, 'policies'>
+): { type: 'file'; sha256: string } | { type: 'symlink'; symlinkTarget: string } {
   if (entry.type === 'file') {
     return {
       type: 'file',
-      sha256: sha256(entry.content)
+      sha256: sha256(config ? normalizeManagedFileContent(config, entry.path, entry.content) : entry.content)
     };
   }
   return {

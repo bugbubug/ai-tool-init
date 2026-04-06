@@ -16,7 +16,7 @@ function maybeRelativeTarget(projectRoot: string, entryPath: string, targetPath:
 export const claudeRenderPlugin: RenderPlugin = {
   id: 'claude',
   render(context) {
-    if (!context.config.platforms.claude.enabled) {
+    if (!context.config.platforms.claude.enabled || context.scope !== 'full') {
       return [];
     }
 

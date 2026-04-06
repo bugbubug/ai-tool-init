@@ -6,7 +6,7 @@ import { createFileEntry, renderProjectSkillV2 } from './render-helpers.js';
 export const codexRenderPlugin: RenderPlugin = {
   id: 'codex',
   render(context) {
-    if (!context.config.platforms.codex.enabled) {
+    if (!context.config.platforms.codex.enabled || context.scope !== 'full') {
       return [];
     }
 

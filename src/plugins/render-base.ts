@@ -17,36 +17,38 @@ export const baseRenderPlugin: RenderPlugin = {
   render(context) {
     const entries: DesiredEntry[] = [];
 
-    entries.push(
-      createFileEntry('AGENTS.md', renderAgentsContractV2(context.config, context.resolvedProviders), {
-        layer: 'system',
-        owner: 'system-baseline',
-        managed: true
-      })
-    );
+    if (context.scope === 'full') {
+      entries.push(
+        createFileEntry('AGENTS.md', renderAgentsContractV2(context.config, context.resolvedProviders), {
+          layer: 'system',
+          owner: 'system-baseline',
+          managed: true
+        })
+      );
 
-    entries.push(
-      createSymlinkEntry('CLAUDE.md', 'AGENTS.md', {
-        layer: 'system',
-        owner: 'system-baseline',
-        managed: true
-      })
-    );
+      entries.push(
+        createSymlinkEntry('CLAUDE.md', 'AGENTS.md', {
+          layer: 'system',
+          owner: 'system-baseline',
+          managed: true
+        })
+      );
 
-    entries.push(
-      createFileEntry('.agents/skills/README.md', '# Team Skills\n\nThis directory contains mounted team skills managed by seli v2.\n', {
-        layer: 'system',
-        owner: 'system-baseline',
-        managed: true
-      })
-    );
-    entries.push(
-      createFileEntry('.agents/skill_team.md', renderSkillTeamContextV2(context.resolvedProviders), {
-        layer: 'team',
-        owner: 'team-context',
-        managed: true
-      })
-    );
+      entries.push(
+        createFileEntry('.agents/skills/README.md', '# Team Skills\n\nThis directory contains mounted team skills managed by seli v2.\n', {
+          layer: 'system',
+          owner: 'system-baseline',
+          managed: true
+        })
+      );
+      entries.push(
+        createFileEntry('.agents/skill_team.md', renderSkillTeamContextV2(context.resolvedProviders), {
+          layer: 'team',
+          owner: 'team-context',
+          managed: true
+        })
+      );
+    }
 
     for (const provider of context.resolvedProviders) {
       for (const skill of provider.selectedSkills) {

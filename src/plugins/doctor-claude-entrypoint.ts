@@ -5,6 +5,7 @@ import { readSymlinkIfExists } from '../infrastructure/fs.js';
 
 export const claudeEntrypointDoctorPlugin: DoctorCheckPlugin = {
   id: 'claude-entrypoint',
+  scopes: ['full'],
   check(context) {
     if (!context.plan.config.platforms.claude.enabled) {
       return;

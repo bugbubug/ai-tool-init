@@ -85,6 +85,14 @@ seli plan --project /absolute/path/to/your-project
 seli update --project /absolute/path/to/your-project
 ```
 
+仅同步 team skills 时使用受限范围：
+
+```bash
+seli plan --project /absolute/path/to/your-project --scope team-skills
+seli update --project /absolute/path/to/your-project --scope team-skills
+seli doctor --project /absolute/path/to/your-project --scope team-skills
+```
+
 ## 安装与运行 / Installation and Run
 
 ### 作为使用者
@@ -117,6 +125,12 @@ provider root 解析优先级（高到低）：
 3. 已持久化 `.selirc`
 4. provider 对应环境变量（例如 `ecc` 对应 `SELI_ECC_ROOT`）
 5. catalog 默认候选路径
+
+scope 说明：
+
+- `full`：默认完整治理，会刷新全部托管基线文件与 team skill 挂载。
+- `team-skills`：仅刷新 `.agents/skills/<skillId>` 软链接，以及 `.selirc` / `.seli.lock`。
+- `team-skills` 只适用于已接入过 seli 且同时存在 `.selirc` 和 `.seli.lock` 的仓库。
 
 intake 仅支持 v2（示例见 `intake/manifest.template.json`）：
 
@@ -168,6 +182,20 @@ bun run typecheck && bun test
 - `update`：面向已有状态的增量刷新。
 
 两者都会先经由计划阶段计算操作，再落地文件变更。
+
+### 如何只新增或同步 team skills，而不改 AGENTS/Claude 基线？
+
+使用 `team-skills` scope：
+
+```bash
+seli update --project /abs/path --scope team-skills
+```
+
+如需校验同一范围：
+
+```bash
+seli doctor --project /abs/path --scope team-skills
+```
 
 ### 如何指定 ECC 技能包路径？
 

@@ -6,7 +6,7 @@ import { computeCurrentFingerprint, isInside } from '../infrastructure/fs.js';
 export const managedStateDoctorPlugin: DoctorCheckPlugin = {
   id: 'managed-state',
   check(context) {
-    for (const managedEntry of context.plan.lockContent.managed) {
+    for (const managedEntry of context.plan.managedEntries) {
       if (!isInside(context.plan.projectRoot, path.join(context.plan.projectRoot, managedEntry.path))) {
         context.errors.push(`Managed path escaped project root: ${managedEntry.path}`);
       }
@@ -16,8 +16,8 @@ export const managedStateDoctorPlugin: DoctorCheckPlugin = {
       return;
     }
 
-    for (const managedEntry of context.plan.existingLock.managed) {
-      const current = computeCurrentFingerprint(context.plan.projectRoot, managedEntry);
+    for (const managedEntry of context.plan.existingManagedEntries) {
+      const current = computeCurrentFingerprint(context.plan.projectRoot, managedEntry, context.plan.config);
       if (!current) {
         context.errors.push(`Managed path missing: ${managedEntry.path}`);
         continue;

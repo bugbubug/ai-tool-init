@@ -1,21 +1,22 @@
 import path from 'node:path';
 
-import type { SeliLockV2, DesiredEntry, InstallPlanOperation } from './contracts.js';
+import type { DesiredEntry, InstallPlanOperation, ManagedEntryV2, SeliConfigV2 } from './contracts.js';
+import { extractCustomBlockContent, getManagedCustomizationMode, injectCustomBlockContent, normalizeManagedFileContent } from './managed-customization.js';
 import { readSymlinkIfExists, readTextIfExists } from '../infrastructure/fs.js';
 
 export function createOperations(
   projectRoot: string,
   desiredEntries: DesiredEntry[],
-  existingLock: SeliLockV2 | null,
-  forcedDeletePaths: string[] = []
+  previousManagedEntries: ManagedEntryV2[] = [],
+  forcedDeletePaths: string[] = [],
+  config?: Pick<SeliConfigV2, 'policies'>
 ): InstallPlanOperation[] {
   const operations: InstallPlanOperation[] = [];
   const desiredManagedEntries = desiredEntries.filter(entry => entry.managed);
   const desiredManagedPaths = new Set(desiredManagedEntries.map(entry => entry.path));
-  const previousManagedEntries = existingLock?.managed ?? [];
   const seenDeletePaths = new Set<string>();
 
-  const pushDelete = (pathRelative: string, previous: SeliLockV2['managed'][number]) => {
+  const pushDelete = (pathRelative: string, previous: ManagedEntryV2) => {
     if (seenDeletePaths.has(pathRelative)) {
       return;
     }
@@ -51,12 +52,24 @@ export function createOperations(
     const absolutePath = path.join(projectRoot, entry.path);
     if (entry.type === 'file') {
       const currentContent = readTextIfExists(absolutePath);
-      if (currentContent !== entry.content) {
+      const mode = config ? getManagedCustomizationMode(config, entry.path) : null;
+      const normalizedCurrent =
+        currentContent && config ? normalizeManagedFileContent(config, entry.path, currentContent) : currentContent;
+      const normalizedExpected = config ? normalizeManagedFileContent(config, entry.path, entry.content) : entry.content;
+      const writeContent =
+        mode === 'custom-block'
+          ? injectCustomBlockContent(entry.content, extractCustomBlockContent(currentContent))
+          : entry.content;
+
+      if (normalizedCurrent !== normalizedExpected) {
         operations.push({
           action: 'write-file',
           path: entry.path,
           absolutePath,
-          entry
+          entry: {
+            ...entry,
+            content: writeContent
+          }
         });
       }
       continue;

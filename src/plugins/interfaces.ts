@@ -3,6 +3,7 @@ import type {
   SeliConfigV2,
   CurrentFingerprint,
   DesiredEntry,
+  InstallScope,
   InstallPlanV2,
   ManagedEntryV2,
   ResolvedProviderV2,
@@ -46,6 +47,7 @@ export interface PolicyPlugin {
 
 export interface RenderContext {
   projectRoot: string;
+  scope: InstallScope;
   config: SeliConfigV2;
   resolvedProviders: ResolvedProviderV2[];
 }
@@ -64,5 +66,6 @@ export interface DoctorCheckContext {
 
 export interface DoctorCheckPlugin {
   id: string;
+  scopes?: InstallScope[];
   check(context: DoctorCheckContext): void;
 }

@@ -5,6 +5,11 @@ export type RequestedOperation = 'init' | 'update' | 'doctor' | 'auto';
 export type MaterializationMode = 'symlink' | 'copy' | string;
 export type DriftPolicy = 'error' | 'warn' | 'ignore';
 export type SymlinkPolicy = 'relative' | 'absolute';
+export type InstallScope = 'full' | 'team-skills';
+export type ManagedCustomizationMode = 'custom-block' | 'local-file';
+export type SkillDecisionRequestedBy = 'config' | 'intake' | 'policy';
+export type SkillDecisionStatus = 'selected' | 'rejected' | 'available';
+export type SkillRejectionReason = 'disallowed_by_provider' | 'missing_from_packages' | 'filtered_by_policy';
 
 export interface ProviderRootMap {
   [providerId: string]: string;
@@ -22,6 +27,7 @@ export interface IntakeProviderInputV2 {
   rootPath?: string | undefined;
   teamPackages?: TeamSkillPackageInputV2[] | undefined;
   requestedSkills?: string[] | undefined;
+  additionalAllowedSkills?: string[] | undefined;
   materializationMode?: MaterializationMode | undefined;
 }
 
@@ -90,6 +96,7 @@ export interface TeamProviderConfigV2 {
   sourceRoot?: string | undefined;
   packages: TeamSkillPackageConfigV2[];
   skills: string[];
+  additionalAllowedSkills?: string[] | undefined;
 }
 
 export interface ProjectSkillConfigV2 {
@@ -135,6 +142,7 @@ export interface PolicyConfigV2 {
   drift: DriftPolicy;
   symlink: SymlinkPolicy;
   compat: string;
+  managedCustomization?: Record<string, ManagedCustomizationMode> | undefined;
 }
 
 export interface PluginConfigV2 {
@@ -176,6 +184,13 @@ export interface ResolvedPackageSkillV2 {
   summary: string;
 }
 
+export interface ProviderSkillDecisionV2 {
+  skillId: string;
+  requestedBy: SkillDecisionRequestedBy;
+  status: SkillDecisionStatus;
+  reason?: SkillRejectionReason | undefined;
+}
+
 export interface ResolvedProviderPackageV2 extends TeamSkillPackageConfigV2 {
   resolvedRoot: string;
   fingerprint: string;
@@ -191,6 +206,11 @@ export interface ResolvedProviderV2 {
   packages: ResolvedProviderPackageV2[];
   selectedSkills: ResolvedPackageSkillV2[];
   availableSkillIds: string[];
+  allowedSkillIds: string[];
+  discoveredSkillIds: string[];
+  requestedSkillIds: string[];
+  rejectedSkillIds: Array<{ skillId: string; reason: SkillRejectionReason; requestedBy: SkillDecisionRequestedBy }>;
+  skillDecisions: ProviderSkillDecisionV2[];
 }
 
 export interface ResolvedSnapshotV2 {
@@ -279,6 +299,12 @@ export interface PluginResolutionSnapshotV2 {
   doctorChecks: string[];
 }
 
+export interface ManagedSummaryV2 {
+  team: string[];
+  project: string[];
+  system: string[];
+}
+
 export interface SeliLockV2 {
   version: 2;
   tool: {
@@ -289,6 +315,7 @@ export interface SeliLockV2 {
   pipelineFingerprint: string;
   pluginResolutions: PluginResolutionSnapshotV2;
   providerPackageSnapshots: ProviderPackageSnapshotV2[];
+  managedSummary?: ManagedSummaryV2 | undefined;
   resolved: {
     providers: Array<{
       id: string;
@@ -310,14 +337,21 @@ export interface InstallPlanSummaryV2 {
   selectedSkillSources: Record<string, string>;
   packageDriftWarnings: string[];
   teamLayerCleanupPaths: string[];
+  selectionErrors: string[];
+  scopeEffects: {
+    writableLayers: string[];
+    protectedPaths: string[];
+  };
 }
 
 export interface InstallPlanV2 {
   command: InstallCommand;
+  scope: InstallScope;
   projectRoot: string;
   config: SeliConfigV2;
   desiredEntries: DesiredEntry[];
   managedEntries: DesiredEntry[];
+  existingManagedEntries: ManagedEntryV2[];
   operations: InstallPlanOperation[];
   lockContent: SeliLockV2;
   existingConfig: boolean;
@@ -344,6 +378,7 @@ export interface ProjectCommandOptionsV2 {
   profileId?: string | undefined;
   intakePath?: string | undefined;
   providerRoots?: ProviderRootMap | undefined;
+  scope?: InstallScope | undefined;
   force?: boolean | undefined;
   outputMode?: CliOutputMode | undefined;
 }
@@ -360,6 +395,7 @@ export interface ParsedCliOptionsV2 {
   profileId: string;
   intakePath: string | null;
   providerRoots: ProviderRootMap;
+  scope: InstallScope;
   force: boolean;
   outputMode: CliOutputMode;
 }

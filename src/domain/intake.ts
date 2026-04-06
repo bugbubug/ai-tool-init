@@ -10,6 +10,10 @@ import type {
 import { readJsonFile } from '../infrastructure/json.js';
 import { uniqueStrings } from '../infrastructure/fs.js';
 
+function hasOwn(value: object | undefined, key: string): boolean {
+  return Boolean(value) && Object.prototype.hasOwnProperty.call(value, key);
+}
+
 function normalizeDocument(document: IntakeDocumentV2, baseDir: string, index: number): IntakeDocumentV2 {
   return {
     id: document.id || `doc-${index + 1}`,
@@ -34,17 +38,42 @@ function normalizeProviders(providers: IntakeProviderInputV2[] | undefined, base
     providerId: provider.providerId,
     materializationMode: provider.materializationMode,
     rootPath: provider.rootPath ? path.resolve(baseDir, provider.rootPath) : undefined,
-    requestedSkills: uniqueStrings(provider.requestedSkills),
-    teamPackages: (provider.teamPackages ?? []).map((item, index) => ({
-      id: item.id || `${provider.providerId}-pkg-${index + 1}`,
-      label: item.label,
-      rootPath: path.resolve(baseDir, item.rootPath),
-      priority: item.priority
-    }))
+    requestedSkills: hasOwn(provider, 'requestedSkills') ? uniqueStrings(provider.requestedSkills) : undefined,
+    additionalAllowedSkills: hasOwn(provider, 'additionalAllowedSkills')
+      ? uniqueStrings(provider.additionalAllowedSkills)
+      : undefined,
+    teamPackages: hasOwn(provider, 'teamPackages')
+      ? (provider.teamPackages ?? []).map((item, index) => ({
+          id: item.id || `${provider.providerId}-pkg-${index + 1}`,
+          label: item.label,
+          rootPath: path.resolve(baseDir, item.rootPath),
+          priority: item.priority
+        }))
+      : undefined
   }));
 }
 
 export function normalizeIntakeV2(input: AgentIntakeManifestV2, baseDir: string): AgentIntakeManifestV2 {
+  const normalizedProject = input.project
+    ? {
+        requestedProjectSkills: hasOwn(input.project, 'requestedProjectSkills')
+          ? uniqueStrings(input.project.requestedProjectSkills)
+          : undefined,
+        projectSkillBlueprints: hasOwn(input.project, 'projectSkillBlueprints')
+          ? (input.project.projectSkillBlueprints ?? []).map(item => ({
+              ...item,
+              guardrails: uniqueStrings(item.guardrails),
+              relatedTeamSkills: uniqueStrings(item.relatedTeamSkills),
+              sourceDocumentLabels: uniqueStrings(item.sourceDocumentLabels),
+              sourcePaths: uniqueStrings(item.sourcePaths).map(sourcePath => path.resolve(baseDir, sourcePath)),
+              whenToUse: uniqueStrings(item.whenToUse),
+              workflow: uniqueStrings(item.workflow)
+            }))
+          : undefined,
+        extraAgents: hasOwn(input.project, 'extraAgents') ? uniqueStrings(input.project.extraAgents) : undefined
+      }
+    : undefined;
+
   return {
     schemaVersion: 2,
     target: {
@@ -55,19 +84,7 @@ export function normalizeIntakeV2(input: AgentIntakeManifestV2, baseDir: string)
     providers: normalizeProviders(input.providers, baseDir),
     documents: (input.documents ?? []).map((document, index) => normalizeDocument(document, baseDir, index)),
     decisions: (input.decisions ?? []).map((decision, index) => normalizeDecision(decision, baseDir, index)),
-    project: {
-      requestedProjectSkills: uniqueStrings(input.project?.requestedProjectSkills),
-      projectSkillBlueprints: (input.project?.projectSkillBlueprints ?? []).map(item => ({
-        ...item,
-        guardrails: uniqueStrings(item.guardrails),
-        relatedTeamSkills: uniqueStrings(item.relatedTeamSkills),
-        sourceDocumentLabels: uniqueStrings(item.sourceDocumentLabels),
-        sourcePaths: uniqueStrings(item.sourcePaths).map(sourcePath => path.resolve(baseDir, sourcePath)),
-        whenToUse: uniqueStrings(item.whenToUse),
-        workflow: uniqueStrings(item.workflow)
-      })),
-      extraAgents: uniqueStrings(input.project?.extraAgents)
-    },
+    project: normalizedProject,
     notes: uniqueStrings(input.notes)
   };
 }

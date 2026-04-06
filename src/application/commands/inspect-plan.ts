@@ -16,6 +16,7 @@ export const inspectPlanCommandModule: CommandModule = {
         profileId: args.profileId,
         intakePath: args.intakePath || undefined,
         providerRoots: args.providerRoots,
+        scope: args.scope,
         force: args.force,
         outputMode: args.outputMode
       },
@@ -24,6 +25,7 @@ export const inspectPlanCommandModule: CommandModule = {
 
     return {
       command: plan.command,
+      scope: plan.scope,
       pipelineFingerprint: plan.lockContent.pipelineFingerprint,
       summary: plan.summary,
       pluginResolutions: plan.lockContent.pluginResolutions,

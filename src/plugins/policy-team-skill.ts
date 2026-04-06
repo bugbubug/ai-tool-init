@@ -47,11 +47,6 @@ export const teamSkillSelectionPolicyPlugin: PolicyPlugin = {
     const keepAvailable = (skills: string[]): string[] =>
       uniqueStrings(hasAvailabilityConstraint ? skills.filter(skill => available.has(skill)) : skills);
 
-    const explicit = input.intake?.providers?.find(provider => provider.providerId === input.providerId)?.requestedSkills;
-    if (explicit && explicit.length > 0) {
-      return keepAvailable(explicit);
-    }
-
     let policy;
     try {
       policy = loadTeamSkillPolicy(input.providerId);

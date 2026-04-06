@@ -122,6 +122,8 @@ function resolvePackages(providerCatalog: ProviderCatalog, providerConfig: TeamP
 }
 
 function resolvePackageSkills(providerCatalog: ProviderCatalog, providerConfig: TeamProviderConfigV2, packages: TeamProviderConfigV2['packages']): ResolvedProviderPackageV2[] {
+  const allowedSkillIds = new Set(uniqueStrings([...(providerCatalog.allowedSkills ?? []), ...(providerConfig.additionalAllowedSkills ?? [])]));
+
   return packages
     .map(item => {
       const resolvedRoot = resolvePackageRoot(item.rootPath, providerCatalog.source.skillsSubdir);
@@ -131,7 +133,7 @@ function resolvePackageSkills(providerCatalog: ProviderCatalog, providerConfig: 
             .readdirSync(skillsRoot)
             .filter(name => !name.startsWith('.'))
             .filter(name => fs.existsSync(path.join(skillsRoot, name, 'SKILL.md')))
-            .filter(name => providerCatalog.allowedSkills.includes(name))
+            .filter(name => allowedSkillIds.has(name))
             .sort()
         : [];
 
@@ -178,8 +180,23 @@ export const eccProviderPlugin: ProviderPlugin = {
     const providerCatalog = loadProviderCatalog(providerConfig.id);
     const packages = resolvePackages(providerCatalog, providerConfig);
     const resolvedPackages = resolvePackageSkills(providerCatalog, providerConfig, packages);
+    const allowedSkillIds = uniqueStrings([...(providerCatalog.allowedSkills ?? []), ...(providerConfig.additionalAllowedSkills ?? [])]).sort();
     const selectedIds = uniqueStrings(providerConfig.skills);
     const availableSkillMap = new Map<string, ResolvedPackageSkillV2>();
+    const discoveredSkillIds = new Set<string>();
+
+    for (const item of packages) {
+      const resolvedRoot = resolvePackageRoot(item.rootPath, providerCatalog.source.skillsSubdir);
+      const skillsRoot = path.join(resolvedRoot, providerCatalog.source.skillsSubdir);
+      if (!fs.existsSync(skillsRoot)) {
+        continue;
+      }
+      for (const skillId of fs.readdirSync(skillsRoot).filter(name => !name.startsWith('.'))) {
+        if (fs.existsSync(path.join(skillsRoot, skillId, 'SKILL.md'))) {
+          discoveredSkillIds.add(skillId);
+        }
+      }
+    }
 
     for (const pkg of resolvedPackages) {
       for (const skill of pkg.skills) {
@@ -196,7 +213,12 @@ export const eccProviderPlugin: ProviderPlugin = {
       resolvedSourceRoot: resolvedPackages[0]?.resolvedRoot ?? this.resolveSourceRoot(providerConfig),
       packages: resolvedPackages,
       selectedSkills: selectedIds.map(skillId => availableSkillMap.get(skillId)).filter(Boolean) as ResolvedPackageSkillV2[],
-      availableSkillIds: Array.from(availableSkillMap.keys()).sort()
+      availableSkillIds: Array.from(availableSkillMap.keys()).sort(),
+      allowedSkillIds,
+      discoveredSkillIds: Array.from(discoveredSkillIds).sort(),
+      requestedSkillIds: [],
+      rejectedSkillIds: [],
+      skillDecisions: []
     };
   }
 };

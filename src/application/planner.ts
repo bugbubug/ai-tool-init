@@ -7,8 +7,11 @@ import type {
   SeliLockV2,
   DesiredEntry,
   InstallCommand,
+  InstallScope,
   InstallPlanSummaryV2,
   InstallPlanV2,
+  ManagedSummaryV2,
+  ManagedEntryV2,
   ProjectCommandOptionsV2,
   ProviderPackageSnapshotV2
 } from '../domain/contracts.js';
@@ -17,6 +20,8 @@ import { createOperations } from '../domain/diff.js';
 import { CONFIG_RELATIVE_PATH_V2, LOCK_RELATIVE_PATH_V2, normalizeConfigV2 } from '../domain/defaults.js';
 import { applyIntakeAndPolicy } from '../domain/config-merge.js';
 import { loadAndNormalizeIntake, resolveRequestedOperation } from '../domain/intake.js';
+import { isLocalFileCustomization, prepareDesiredEntryForCustomization } from '../domain/managed-customization.js';
+import { filterEntriesByScope, isEntryInScope, normalizeInstallScope } from '../domain/scope.js';
 import {
   createBootstrapConfigV2,
   detectLegacyState,
@@ -81,7 +86,9 @@ function buildSummary(
   resolvedProviders: InstallPlanV2['resolved']['providers'],
   operations: InstallPlanV2['operations'],
   managedEntries: InstallPlanV2['managedEntries'],
-  existingLock: SeliLockV2 | null
+  existingLock: SeliLockV2 | null,
+  selectionErrors: string[],
+  scope: InstallScope
 ): InstallPlanSummaryV2 {
   const collisions = config.layers.project.skills
     .map(skill => skill.id)
@@ -100,11 +107,30 @@ function buildSummary(
     packageDriftWarnings: computePackageDriftWarnings(resolvedProviders, existingLock),
     profile: config.profile,
     resolvedPackageCount,
+    selectionErrors,
     selectedSkillSources,
+    scopeEffects:
+      scope === 'team-skills'
+        ? {
+            writableLayers: ['team', 'state'],
+            protectedPaths: ['AGENTS.md', '.claude/*', '.codex/*', '.agents/skill_team.md', '.agents/skills/README.md']
+          }
+        : {
+            writableLayers: ['system', 'team', 'project', 'state'],
+            protectedPaths: []
+          },
     teamLayerCleanupPaths: operations
       .filter(operation => operation.action === 'delete' && operation.path.startsWith('.agents/skills/'))
       .map(operation => operation.path)
       .sort()
+  };
+}
+
+function buildManagedSummary(entries: ManagedEntryV2[]): ManagedSummaryV2 {
+  return {
+    team: entries.filter(entry => entry.layer === 'team').map(entry => entry.path).sort(),
+    project: entries.filter(entry => entry.layer === 'project').map(entry => entry.path).sort(),
+    system: entries.filter(entry => entry.layer === 'system').map(entry => entry.path).sort()
   };
 }
 
@@ -142,20 +168,28 @@ function collectTeamLayerCleanupPaths(projectRoot: string, selectedTeamSkillIds:
 
 function buildLockContent(
   _command: InstallCommand,
+  scope: InstallScope,
   config: SeliConfigV2,
   desiredManagedEntries: DesiredEntry[],
+  existingManagedEntries: ManagedEntryV2[],
   packageVersion: string,
   env: RuntimeEnvironment,
   resolvedProviders: InstallPlanV2['resolved']['providers']
 ): SeliLockV2 {
+  const managedEntries = stableSortEntries([
+    ...existingManagedEntries.filter(entry => !isEntryInScope(entry, scope) && !isLocalFileCustomization(config, entry.path)),
+    ...desiredManagedEntries.map(entry => ({
+      layer: entry.layer,
+      owner: entry.owner,
+      path: entry.path,
+      ...managedFingerprintFromDesired(entry, config)
+    }))
+  ]);
   const providerPackageSnapshots = toPackageSnapshots(resolvedProviders);
   const pipelineFingerprint = sha256(
     JSON.stringify({
       profile: config.profile,
-      managed: desiredManagedEntries.map(entry => ({
-        path: entry.path,
-        ...managedFingerprintFromDesired(entry)
-      })),
+      managed: managedEntries,
       providers: providerPackageSnapshots.map(item => ({
         providerId: item.providerId,
         packageId: item.packageId,
@@ -179,6 +213,7 @@ function buildLockContent(
       doctorChecks: env.doctorRegistry.list()
     },
     providerPackageSnapshots,
+    managedSummary: buildManagedSummary(managedEntries),
     resolved: {
       providers: resolvedProviders.map(provider => ({
         id: provider.id,
@@ -200,12 +235,7 @@ function buildLockContent(
         }))
       }))
     },
-    managed: desiredManagedEntries.map(entry => ({
-      layer: entry.layer,
-      owner: entry.owner,
-      path: entry.path,
-      ...managedFingerprintFromDesired(entry)
-    }))
+    managed: managedEntries
   };
 }
 
@@ -224,6 +254,7 @@ function buildRegistrySnapshot(config: SeliConfigV2, env: RuntimeEnvironment): S
 
 export function createPlanV2(command: InstallCommand, options: ProjectCommandOptionsV2, env: RuntimeEnvironment): InstallPlanV2 {
   const projectRoot = path.resolve(options.projectRoot);
+  const scope = normalizeInstallScope(options.scope);
   if (hasUnsupportedLegacyState(projectRoot)) {
     throw new Error(
       `Unsupported legacy state detected under ${projectRoot}. Remove .ai-tool-init/, .aitoolinit.json, and .seli before running seli.`
@@ -247,6 +278,13 @@ export function createPlanV2(command: InstallCommand, options: ProjectCommandOpt
   const bootstrapProfile = intake?.target?.profile || options.profileId || 'default';
   const existingLock = loadExistingLockV2(projectRoot);
 
+  if (command === 'init' && scope === 'team-skills') {
+    throw new Error('init does not support --scope team-skills. Run a full init first.');
+  }
+  if (scope === 'team-skills' && (!existingConfig || !existingLock)) {
+    throw new Error('team-skills scope requires an existing seli-managed project with both .selirc and .seli.lock.');
+  }
+
   const baseConfig = existingConfig
     ? normalizeConfigV2(existingConfig)
     : createBootstrapConfigV2(projectRoot, bootstrapProfile).config;
@@ -255,7 +293,15 @@ export function createPlanV2(command: InstallCommand, options: ProjectCommandOpt
     Object.entries(options.providerRoots ?? {}).map(([providerId, providerRoot]) => [providerId, path.resolve(providerRoot)])
   );
 
-  const applied = applyIntakeAndPolicy(baseConfig, intake, providerRoots, env.providerRegistry, env.policyRegistry);
+  const applied = applyIntakeAndPolicy(
+    baseConfig,
+    intake,
+    providerRoots,
+    env.providerRegistry,
+    env.policyRegistry,
+    scope,
+    Boolean(existingConfig)
+  );
   const configWithRegistry = buildRegistrySnapshot(applied.config, env);
   const config = normalizeConfigV2(configWithRegistry);
 
@@ -264,13 +310,28 @@ export function createPlanV2(command: InstallCommand, options: ProjectCommandOpt
       .all()
       .flatMap(plugin => plugin.render({
         projectRoot,
+        scope,
         config,
         resolvedProviders: applied.resolvedProviders
       }))
+      .map(entry => prepareDesiredEntryForCustomization(config, entry))
+      .filter(Boolean) as DesiredEntry[]
   );
 
   const managedEntries = desiredEntries.filter(item => item.managed);
-  const lockContent = buildLockContent(effectiveCommand, config, managedEntries, packageJson.version, env, applied.resolvedProviders);
+  const existingManagedEntries = filterEntriesByScope(existingLock?.managed ?? [], scope).filter(
+    entry => !isLocalFileCustomization(config, entry.path)
+  );
+  const lockContent = buildLockContent(
+    effectiveCommand,
+    scope,
+    config,
+    managedEntries,
+    existingLock?.managed ?? [],
+    packageJson.version,
+    env,
+    applied.resolvedProviders
+  );
 
   const configContent = `${JSON.stringify(config, null, 2)}\n`;
   const configEntry = createFileEntry(CONFIG_RELATIVE_PATH_V2, configContent, {
@@ -290,19 +351,21 @@ export function createPlanV2(command: InstallCommand, options: ProjectCommandOpt
     projectRoot,
     applied.resolvedProviders.flatMap(provider => provider.selectedSkills.map(skill => skill.skillId))
   );
-  const operations = createOperations(projectRoot, entriesWithState, existingLock, teamLayerCleanupPaths);
+  const operations = createOperations(projectRoot, entriesWithState, existingManagedEntries, teamLayerCleanupPaths, config);
 
   return {
     command: effectiveCommand,
+    scope,
     projectRoot,
     config,
     desiredEntries: entriesWithState,
     managedEntries,
+    existingManagedEntries,
     operations,
     lockContent,
     existingConfig: Boolean(existingConfig),
     existingLock,
-    summary: buildSummary(config, applied.resolvedProviders, operations, managedEntries, existingLock),
+    summary: buildSummary(config, applied.resolvedProviders, operations, managedEntries, existingLock, applied.selectionErrors, scope),
     intake,
     resolved: {
       providers: applied.resolvedProviders
@@ -313,6 +376,7 @@ export function createPlanV2(command: InstallCommand, options: ProjectCommandOpt
 export function explainPlanV2(plan: InstallPlanV2): string {
   const lines = [
     `Command: ${plan.command}`,
+    `Scope: ${plan.scope}`,
     `Project: ${plan.projectRoot}`,
     `Profile: ${plan.summary.profile}`,
     `Resolved packages: ${plan.summary.resolvedPackageCount}`,
@@ -335,6 +399,10 @@ export function explainPlanV2(plan: InstallPlanV2): string {
 
   if (plan.summary.packageDriftWarnings.length > 0) {
     lines.push(`Package warnings: ${plan.summary.packageDriftWarnings.join('; ')}`);
+  }
+
+  if (plan.summary.selectionErrors.length > 0) {
+    lines.push(`Selection errors: ${plan.summary.selectionErrors.join('; ')}`);
   }
 
   if (plan.summary.teamLayerCleanupPaths.length > 0) {

@@ -16,6 +16,7 @@ export const planCommandModule: CommandModule = {
         profileId: args.profileId,
         intakePath: args.intakePath || undefined,
         providerRoots: args.providerRoots,
+        scope: args.scope,
         force: args.force,
         outputMode: args.outputMode
       },

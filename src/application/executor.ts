@@ -16,8 +16,8 @@ function assertNoManagedDrift(plan: InstallPlanV2, env: RuntimeEnvironment, forc
   for (const policy of driftPolicies) {
     const result = policy.checkManagedDrift!({
       projectRoot: plan.projectRoot,
-      existingManagedEntries: plan.existingLock.managed,
-      computeCurrentFingerprint: entry => computeCurrentFingerprint(plan.projectRoot, entry)
+      existingManagedEntries: plan.existingManagedEntries,
+      computeCurrentFingerprint: entry => computeCurrentFingerprint(plan.projectRoot, entry, plan.config)
     });
     drifts = [...drifts, ...result.drifts];
   }
@@ -51,6 +51,10 @@ function applyOperation(operation: InstallPlanV2['operations'][number]): void {
 }
 
 export function executePlanV2(plan: InstallPlanV2, env: RuntimeEnvironment, options: { force?: boolean | undefined } = {}): ExecuteResultV2 {
+  if (plan.summary.selectionErrors.length > 0) {
+    throw new Error(plan.summary.selectionErrors.join('; '));
+  }
+
   assertNoManagedDrift(plan, env, Boolean(options.force));
 
   for (const operation of plan.operations.filter(item => item.action === 'delete')) {

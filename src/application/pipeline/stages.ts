@@ -12,6 +12,9 @@ export function verifyStage(plan: InstallPlanV2, env: RuntimeEnvironment): Docto
   const info: string[] = [];
 
   for (const plugin of env.doctorRegistry.all()) {
+    if (plugin.scopes && !plugin.scopes.includes(plan.scope)) {
+      continue;
+    }
     plugin.check({
       plan,
       errors,

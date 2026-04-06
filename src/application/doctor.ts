@@ -7,6 +7,10 @@ export function runDoctorV2(options: ProjectCommandOptionsV2, env: RuntimeEnviro
   const plan = createPlanV2('doctor', options, env);
   const result = verifyStage(plan, env);
 
+  if (plan.summary.selectionErrors.length > 0) {
+    result.errors.push(...plan.summary.selectionErrors);
+  }
+
   if (!plan.existingConfig) {
     result.warnings.push('Target repository is not onboarded yet; manifest will be bootstrapped from detected state.');
   }
