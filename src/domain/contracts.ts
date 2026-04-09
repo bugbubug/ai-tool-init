@@ -7,6 +7,7 @@ export type DriftPolicy = 'error' | 'warn' | 'ignore';
 export type SymlinkPolicy = 'relative' | 'absolute';
 export type InstallScope = 'full' | 'team-skills';
 export type ManagedCustomizationMode = 'custom-block' | 'local-file';
+export type IntakePathBaseV2 = 'project' | 'manifest';
 export type SkillDecisionRequestedBy = 'config' | 'intake' | 'policy';
 export type SkillDecisionStatus = 'selected' | 'rejected' | 'available';
 export type SkillRejectionReason = 'disallowed_by_provider' | 'missing_from_packages' | 'filtered_by_policy';
@@ -37,6 +38,7 @@ export type IntakeDocumentScope = 'system' | 'team' | 'project';
 export interface IntakeDocumentV2 {
   id: string;
   path: string;
+  pathBase?: IntakePathBaseV2 | undefined;
   label: string;
   kind: IntakeDocumentKind;
   appliesTo: IntakeDocumentScope;
@@ -46,12 +48,14 @@ export interface IntakeDecisionV2 {
   id: string;
   summary: string;
   appliesTo?: IntakeDocumentScope | undefined;
+  pathBase?: IntakePathBaseV2 | undefined;
   sourcePaths?: string[] | undefined;
 }
 
 export interface ProjectSkillBlueprintV2 {
   id: string;
   description: string;
+  pathBase?: IntakePathBaseV2 | undefined;
   whenToUse?: string[] | undefined;
   workflow?: string[] | undefined;
   guardrails?: string[] | undefined;
@@ -61,6 +65,7 @@ export interface ProjectSkillBlueprintV2 {
 }
 
 export interface IntakeProjectInputV2 {
+  summary?: string | undefined;
   requestedProjectSkills?: string[] | undefined;
   projectSkillBlueprints?: ProjectSkillBlueprintV2[] | undefined;
   extraAgents?: string[] | undefined;
@@ -117,6 +122,7 @@ export interface CompatPluginConfigV2 {
 }
 
 export interface ProjectLayerConfigV2 {
+  summary?: string | undefined;
   skills: ProjectSkillConfigV2[];
   compatPlugin: CompatPluginConfigV2;
   extraAgents: string[];
@@ -451,6 +457,7 @@ export interface ProfileCatalogV2 {
         }>;
       };
       project: {
+        summary?: string;
         skills: Array<{
           id: string;
           description: string;

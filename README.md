@@ -145,6 +145,15 @@ intake 仅支持 v2（示例见 `intake/manifest.template.json`）：
 }
 ```
 
+intake 路径解析规则：
+
+- `providers[].rootPath` / `providers[].teamPackages[].rootPath` 继续相对 intake 文件目录解析。
+- `documents[].path`、`decisions[].sourcePaths`、`project.projectSkillBlueprints[].sourcePaths` 在存在 `target.projectPath` 时默认相对项目根目录解析。
+- 如果 `target.projectPath` 缺失，上述项目内路径会回退为相对 intake 文件目录解析。
+- 如需强制相对 intake 文件目录解析，可在对应条目上设置 `"pathBase": "manifest"`。
+
+`project.summary` 会进入生成的 `AGENTS.md` 的 `Project Context`，适合写简短项目背景；不要把操作步骤写进这里。
+
 ## 开发说明 / Development
 
 常用命令：

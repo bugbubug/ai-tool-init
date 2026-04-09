@@ -103,28 +103,51 @@ function resolveBlueprints(
 function applyBlueprints(config: SeliConfigV2, blueprints: ProjectSkillBlueprintV2[]): void {
   const existingSkillMap = new Map(config.layers.project.skills.map(skill => [skill.id, skill]));
   const unmanagedSkills = config.layers.project.skills.filter(skill => skill.managed === false);
-  const requiredSkillIds = new Set(REQUIRED_PROJECT_SKILLS.map(skill => skill.id));
-  const requiredSkills = config.layers.project.skills.filter(skill => requiredSkillIds.has(skill.id));
+  const blueprintMap = new Map(blueprints.map(blueprint => [blueprint.id, blueprint]));
+  const reservedIds = new Set<string>([...REQUIRED_PROJECT_SKILLS.map(skill => skill.id), ...blueprintMap.keys()]);
+
+  const toManagedSkill = (skillId: string, blueprint?: ProjectSkillBlueprintV2): ProjectSkillConfigV2 => {
+    const existingSkill = existingSkillMap.get(skillId);
+    if (!blueprint) {
+      return {
+        ...createManagedProjectSkill(skillId, existingSkill),
+        guardrails: uniqueStrings(existingSkill?.guardrails),
+        relatedTeamSkills: uniqueStrings(existingSkill?.relatedTeamSkills),
+        sourceDocumentLabels: uniqueStrings(existingSkill?.sourceDocumentLabels),
+        sourcePaths: uniqueStrings(existingSkill?.sourcePaths),
+        whenToUse: uniqueStrings(existingSkill?.whenToUse),
+        workflow: uniqueStrings(existingSkill?.workflow)
+      };
+    }
+
+    return {
+      ...createManagedProjectSkill(skillId, existingSkill),
+      description: blueprint.description,
+      guardrails: uniqueStrings(blueprint.guardrails),
+      relatedTeamSkills: uniqueStrings(blueprint.relatedTeamSkills),
+      sourceDocumentLabels: uniqueStrings(blueprint.sourceDocumentLabels),
+      sourcePaths: uniqueStrings(blueprint.sourcePaths),
+      whenToUse: uniqueStrings(blueprint.whenToUse),
+      workflow: uniqueStrings(blueprint.workflow)
+    };
+  };
+
+  const requiredSkills = REQUIRED_PROJECT_SKILLS.map(skill => toManagedSkill(skill.id, blueprintMap.get(skill.id)));
 
   if (blueprints.length === 0) {
-    config.layers.project.skills = [...requiredSkills, ...unmanagedSkills];
+    config.layers.project.skills = [...requiredSkills, ...unmanagedSkills.filter(skill => !reservedIds.has(skill.id))];
     return;
   }
 
-  const managedSkills = blueprints.map(blueprint => ({
-    ...createManagedProjectSkill(blueprint.id, existingSkillMap.get(blueprint.id)),
-    description: blueprint.description,
-    guardrails: uniqueStrings(blueprint.guardrails),
-    relatedTeamSkills: uniqueStrings(blueprint.relatedTeamSkills),
-    sourceDocumentLabels: uniqueStrings(blueprint.sourceDocumentLabels),
-    sourcePaths: uniqueStrings(blueprint.sourcePaths),
-    whenToUse: uniqueStrings(blueprint.whenToUse),
-    workflow: uniqueStrings(blueprint.workflow)
-  }));
+  const managedSkills = Array.from(blueprintMap.values())
+    .filter(blueprint => !REQUIRED_PROJECT_SKILLS.some(skill => skill.id === blueprint.id))
+    .map(blueprint => toManagedSkill(blueprint.id, blueprint));
 
-  config.layers.project.skills = [...requiredSkills, ...managedSkills, ...unmanagedSkills].filter(
-    (skill, index, items) => items.findIndex(item => item.id === skill.id) === index
-  );
+  config.layers.project.skills = [
+    ...requiredSkills,
+    ...managedSkills,
+    ...unmanagedSkills.filter(skill => !reservedIds.has(skill.id))
+  ];
 }
 
 function normalizeProviderPackages(
@@ -378,6 +401,10 @@ export function applyIntakeAndPolicy(
     const blueprints = resolveBlueprints(intake, config.layers.project.skills, selectedTeamSkills);
     if (blueprints) {
       applyBlueprints(config, blueprints);
+    }
+
+    if (hasOwn(intake?.project, 'summary')) {
+      config.layers.project.summary = intake?.project?.summary?.trim() || undefined;
     }
 
     if (hasOwn(intake?.project, 'extraAgents')) {

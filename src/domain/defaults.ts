@@ -200,6 +200,7 @@ export function buildConfigFromProfileV2(profileId = 'default'): SeliConfigV2 {
         }))
       },
       project: {
+        summary: source.layers.project.summary,
         skills: source.layers.project.skills.map(skill => ({ ...skill })),
         compatPlugin: {
           enabled: false,
@@ -216,7 +217,7 @@ export function buildConfigFromProfileV2(profileId = 'default'): SeliConfigV2 {
       managedCustomization: defaultManagedCustomization()
     },
     plugins: {
-      enabled: ['provider:ecc', 'renderer:base', 'renderer:codex', 'renderer:claude', 'policy:team-skill-selection', 'policy:drift-check', 'doctor:managed-state', 'doctor:provider-state', 'doctor:claude-entrypoint', 'doctor:duplicate-skills']
+      enabled: ['provider:ecc', 'renderer:base', 'renderer:codex', 'renderer:claude', 'policy:team-skill-selection', 'policy:drift-check', 'doctor:managed-state', 'doctor:provider-state', 'doctor:claude-entrypoint', 'doctor:duplicate-skills', 'doctor:ignored-managed-paths']
     },
     registriesSnapshot: buildRegistriesSnapshotDefault(),
     commandDefaults: {
@@ -239,6 +240,7 @@ export function normalizeConfigV2(input: SeliConfigV2): SeliConfigV2 {
     system: { baselineVersion: '2.0.0', modules: ['codex', 'claude'] },
     team: { providers: [] },
     project: {
+      summary: undefined,
       skills: [],
       compatPlugin: { enabled: false, pluginId: 'disabled' },
       extraAgents: ['explorer', 'reviewer']
@@ -251,10 +253,12 @@ export function normalizeConfigV2(input: SeliConfigV2): SeliConfigV2 {
   config.layers.team.providers = (config.layers.team.providers || []).map(provider => normalizeProvider(provider));
 
   config.layers.project = config.layers.project || {
+    summary: undefined,
     skills: [],
     compatPlugin: { enabled: false, pluginId: 'disabled' },
     extraAgents: ['explorer', 'reviewer']
   };
+  config.layers.project.summary = config.layers.project.summary?.trim() || undefined;
   config.layers.project.skills = ensureRequiredProjectSkills(
     (config.layers.project.skills || []).map(skill => ({
       ...skill,

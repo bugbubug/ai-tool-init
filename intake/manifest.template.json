@@ -44,10 +44,19 @@
     }
   ],
   "project": {
+    "summary": "Short project background for AGENTS.md Project Context.",
     "requestedProjectSkills": [
       "repo-governance"
     ],
-    "projectSkillBlueprints": [],
+    "projectSkillBlueprints": [
+      {
+        "id": "repo-governance",
+        "description": "Repository-specific governance guidance.",
+        "sourcePaths": [
+          "docs/requirements.md"
+        ]
+      }
+    ],
     "extraAgents": [
       "explorer",
       "reviewer"
@@ -56,6 +65,8 @@
   "notes": [
     "Copy this file to intake/manifest.json and replace placeholders with run-specific input.",
     "Use schemaVersion=2 only. Legacy version=1 manifests are not supported.",
-    "Use absolute paths for provider roots and target project path."
+    "Use absolute paths for provider roots and target project path.",
+    "documents.path, decisions.sourcePaths, and project.projectSkillBlueprints[].sourcePaths default to target.projectPath when present.",
+    "Set pathBase to manifest when a document path should stay relative to the intake file directory."
   ]
 }

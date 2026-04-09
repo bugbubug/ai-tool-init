@@ -59,6 +59,19 @@ function uniqueValues(values: readonly string[]): string[] {
   return result;
 }
 
+function isDirectiveProjectSignal(value: string): boolean {
+  const normalized = normalizeLine(value).toLowerCase();
+  return (
+    normalized.startsWith('use when ') ||
+    normalized.startsWith('use this skill when ') ||
+    normalized.startsWith('review ') ||
+    normalized.startsWith('first ') ||
+    normalized.startsWith('after ') ||
+    normalized.startsWith('do not ') ||
+    normalized.startsWith('always ')
+  );
+}
+
 function toBullets(values: readonly string[], maxItems: number): string[] {
   return uniqueValues(values)
     .slice(0, maxItems)
@@ -77,6 +90,7 @@ function prioritizeProjectSkills(config: SeliConfigV2): ProjectSkillConfigV2[] {
 
 function renderProjectContext(config: SeliConfigV2): string {
   const prioritizedSkills = prioritizeProjectSkills(config);
+  const projectSummary = normalizeLine(config.layers.project.summary ?? '');
   const customSkillDescriptions = uniqueValues(
     prioritizedSkills
       .filter(skill => !BASELINE_PROJECT_SKILL_IDS.has(skill.id))
@@ -91,9 +105,11 @@ function renderProjectContext(config: SeliConfigV2): string {
   );
   const projectSkillDescriptions = customSkillDescriptions.length > 0 ? customSkillDescriptions : baselineSkillDescriptions;
   const sourceDocumentLabels = uniqueValues(prioritizedSkills.flatMap(skill => skill.sourceDocumentLabels ?? [])).slice(0, MAX_DOCUMENT_LABELS);
-  const projectSignals = uniqueValues(prioritizedSkills.flatMap(skill => [...(skill.whenToUse ?? []), ...(skill.workflow ?? [])]));
+  const projectSignals = uniqueValues(
+    prioritizedSkills.flatMap(skill => [...(skill.whenToUse ?? []), ...(skill.workflow ?? [])])
+  ).filter(signal => !isDirectiveProjectSignal(signal));
 
-  const contextCandidates = [...projectSkillDescriptions];
+  const contextCandidates = projectSummary ? [projectSummary, ...projectSkillDescriptions] : [...projectSkillDescriptions];
   if (sourceDocumentLabels.length > 0) {
     contextCandidates.push(`Refer to project documents: ${sourceDocumentLabels.join(', ')}.`);
   }

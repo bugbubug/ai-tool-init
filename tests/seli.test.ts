@@ -13,6 +13,7 @@ import {
   updateProject
 } from '../src/index.js';
 import type { AgentIntakeManifestV2, SeliConfigV2, SeliLockV2 } from '../src/domain/contracts.js';
+import { loadAndNormalizeIntake } from '../src/domain/intake.js';
 
 function makeTempDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -63,8 +64,16 @@ function createFakeEccSource(rootPath: string): void {
     'database-migrations',
     'design-system',
     'browser-qa',
+    'deployment-patterns',
     'article-writing'
   ]);
+}
+
+function initGitRepo(rootPath: string): void {
+  execFileSync('git', ['init'], {
+    cwd: rootPath,
+    encoding: 'utf8'
+  });
 }
 
 function writeIntakeV2(rootPath: string, manifest: AgentIntakeManifestV2): string {
@@ -248,6 +257,212 @@ test('AGENTS keeps concise bullet and length limits', () => {
   }
   expect(agentsContract).not.toContain('Team skill context:');
   expect(agentsContract).not.toContain('## Tech Stack Guidance');
+});
+
+test('required project skill blueprints override defaults on init', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-required-blueprint-project-');
+  const intakeRoot = makeTempDir('seli-required-blueprint-intake-');
+  createFakeEccSource(eccRoot);
+
+  const intakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot }],
+    project: {
+      projectSkillBlueprints: [
+        {
+          id: 'repo-governance',
+          description: 'Repository-specific governance for Glid launch operations.',
+          whenToUse: ['When repository operating rules diverge from baseline defaults.'],
+          workflow: ['Check release governance notes before changing shared project automation.'],
+          guardrails: ['Do not bypass launch governance approvals recorded in project docs.']
+        },
+        {
+          id: 'change-closeout',
+          description: 'Closeout format tuned for Glid delivery reporting.',
+          whenToUse: ['When summarizing changes for Glid delivery stakeholders.'],
+          workflow: ['List user-visible impact before implementation details in closeout.'],
+          guardrails: ['Always mention rollout risk if checkout logic changed.']
+        }
+      ]
+    }
+  });
+
+  initProject({ projectRoot, intakePath });
+
+  const config = readConfig(projectRoot);
+  const repoGovernance = config.layers.project.skills.find(skill => skill.id === 'repo-governance');
+  const changeCloseout = config.layers.project.skills.find(skill => skill.id === 'change-closeout');
+
+  expect(repoGovernance?.managed).toBe(true);
+  expect(repoGovernance?.description).toBe('Repository-specific governance for Glid launch operations.');
+  expect(repoGovernance?.whenToUse).toEqual(['When repository operating rules diverge from baseline defaults.']);
+  expect(repoGovernance?.workflow).toEqual(['Check release governance notes before changing shared project automation.']);
+  expect(repoGovernance?.guardrails).toEqual(['Do not bypass launch governance approvals recorded in project docs.']);
+  expect(changeCloseout?.description).toBe('Closeout format tuned for Glid delivery reporting.');
+  expect(changeCloseout?.whenToUse).toEqual(['When summarizing changes for Glid delivery stakeholders.']);
+  expect(changeCloseout?.workflow).toEqual(['List user-visible impact before implementation details in closeout.']);
+  expect(changeCloseout?.guardrails).toEqual(['Always mention rollout risk if checkout logic changed.']);
+
+  const repoGovernanceDoc = fs.readFileSync(
+    path.join(projectRoot, '.codex', 'skills', 'repo-governance', 'SKILL.md'),
+    'utf8'
+  );
+  const changeCloseoutDoc = fs.readFileSync(
+    path.join(projectRoot, '.codex', 'skills', 'change-closeout', 'SKILL.md'),
+    'utf8'
+  );
+  expect(repoGovernanceDoc).toContain('Repository-specific governance for Glid launch operations.');
+  expect(repoGovernanceDoc).not.toContain('Generic repository governance and topology guardrails.');
+  expect(changeCloseoutDoc).toContain('Closeout format tuned for Glid delivery reporting.');
+  expect(changeCloseoutDoc).not.toContain('Generic repo-local closeout checklist and reporting template.');
+});
+
+test('intake project-relative paths default to target project root and support manifest override', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-project-path-base-');
+  const intakeRoot = makeTempDir('seli-intake-path-base-');
+  createFakeEccSource(eccRoot);
+
+  writeText(path.join(projectRoot, 'docs', 'project.md'), '# project doc\n');
+  writeText(path.join(intakeRoot, 'docs', 'manifest.md'), '# manifest doc\n');
+
+  const intakePath = writeIntakeV2(path.join(intakeRoot, 'intake'), {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot }],
+    documents: [
+      {
+        id: 'project-doc',
+        path: 'docs/project.md',
+        label: 'Project Doc',
+        kind: 'requirements',
+        appliesTo: 'project'
+      },
+      {
+        id: 'manifest-doc',
+        path: 'docs/manifest.md',
+        pathBase: 'manifest',
+        label: 'Manifest Doc',
+        kind: 'requirements',
+        appliesTo: 'project'
+      }
+    ],
+    decisions: [
+      {
+        id: 'decision-1',
+        summary: 'Use project-root relative decisions by default.',
+        appliesTo: 'project',
+        sourcePaths: ['docs/project.md']
+      },
+      {
+        id: 'decision-2',
+        summary: 'Allow manifest-relative overrides.',
+        appliesTo: 'project',
+        pathBase: 'manifest',
+        sourcePaths: ['docs/manifest.md']
+      }
+    ],
+    project: {
+      projectSkillBlueprints: [
+        {
+          id: 'repo-governance',
+          description: 'Project-root path resolution test.',
+          sourcePaths: ['docs/project.md']
+        },
+        {
+          id: 'change-closeout',
+          description: 'Manifest-relative blueprint path override test.',
+          pathBase: 'manifest',
+          sourcePaths: ['docs/manifest.md']
+        }
+      ]
+    }
+  });
+
+  initProject({ projectRoot, intakePath });
+  const config = readConfig(projectRoot);
+
+  expect(config.layers.project.skills.find(skill => skill.id === 'repo-governance')?.sourcePaths).toEqual([
+    path.join(projectRoot, 'docs', 'project.md')
+  ]);
+  expect(config.layers.project.skills.find(skill => skill.id === 'change-closeout')?.sourcePaths).toEqual([
+    path.join(intakeRoot, 'intake', 'docs', 'manifest.md')
+  ]);
+});
+
+test('intake project paths fall back to manifest directory when target project path is absent', () => {
+  const intakeRoot = makeTempDir('seli-intake-fallback-');
+  writeText(path.join(intakeRoot, 'docs', 'fallback.md'), '# fallback\n');
+
+  const intake = loadAndNormalizeIntake(writeIntakeV2(path.join(intakeRoot, 'nested'), {
+    schemaVersion: 2,
+    documents: [
+      {
+        id: 'doc-1',
+        path: 'docs/fallback.md',
+        label: 'Fallback Doc',
+        kind: 'requirements',
+        appliesTo: 'project'
+      }
+    ],
+    decisions: [
+      {
+        id: 'decision-1',
+        summary: 'Fallback to manifest-relative resolution.',
+        sourcePaths: ['docs/fallback.md']
+      }
+    ],
+    project: {
+      projectSkillBlueprints: [
+        {
+          id: 'repo-governance',
+          description: 'Fallback path resolution',
+          sourcePaths: ['docs/fallback.md']
+        }
+      ]
+    }
+  }));
+
+  expect(intake.documents?.[0]?.path).toBe(path.join(intakeRoot, 'nested', 'docs', 'fallback.md'));
+  expect(intake.decisions?.[0]?.sourcePaths).toEqual([path.join(intakeRoot, 'nested', 'docs', 'fallback.md')]);
+  expect(intake.project?.projectSkillBlueprints?.[0]?.sourcePaths).toEqual([
+    path.join(intakeRoot, 'nested', 'docs', 'fallback.md')
+  ]);
+});
+
+test('AGENTS project context prefers explicit project summary and avoids directive fallback text', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-summary-project-');
+  const intakeRoot = makeTempDir('seli-summary-intake-');
+  createFakeEccSource(eccRoot);
+
+  const intakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['frontend-patterns'] }],
+    project: {
+      summary: 'Glid focuses on onboarding conversion and payment completion for its current launch market.',
+      projectSkillBlueprints: [
+        {
+          id: 'launch-funnel',
+          description: 'Optimize launch funnel metrics.',
+          whenToUse: ['Use when onboarding copy or activation nudges change.'],
+          workflow: ['Review analytics snapshots before proposing UX changes.']
+        }
+      ]
+    }
+  });
+
+  initProject({ projectRoot, intakePath });
+
+  const agentsContract = fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8');
+  expect(agentsContract).toContain(
+    'Glid focuses on onboarding conversion and payment completion for its current launch market.'
+  );
+  expect(agentsContract).not.toContain('Current delivery focus: Use when onboarding copy or activation nudges change.');
+  expect(agentsContract).not.toContain('Current delivery focus: Review analytics snapshots before proposing UX changes.');
 });
 
 test('update rewrites legacy AGENTS first-question block', () => {
@@ -540,6 +755,43 @@ test('additionalAllowedSkills lets project opt into provider-blocked skills', ()
   expect(fs.lstatSync(path.join(projectRoot, '.agents', 'skills', 'browser-qa')).isSymbolicLink()).toBe(true);
 });
 
+test('ecc default allowlist includes browser-qa and deployment-patterns', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-ecc-default-allowlist-');
+  const intakeRoot = makeTempDir('seli-ecc-default-allowlist-intake-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  const intakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [
+      {
+        providerId: 'ecc',
+        rootPath: eccRoot,
+        requestedSkills: ['browser-qa', 'deployment-patterns']
+      }
+    ]
+  });
+
+  const result = updateProject({
+    projectRoot,
+    intakePath,
+    scope: 'team-skills'
+  });
+
+  expect(result.plan.summary.selectionErrors).toEqual([]);
+  expect(readConfig(projectRoot).layers.team.providers[0]?.skills).toEqual(['browser-qa', 'deployment-patterns']);
+  expect(fs.lstatSync(path.join(projectRoot, '.agents', 'skills', 'browser-qa')).isSymbolicLink()).toBe(true);
+  expect(fs.lstatSync(path.join(projectRoot, '.agents', 'skills', 'deployment-patterns')).isSymbolicLink()).toBe(
+    true
+  );
+});
+
 test('missing requested skill reports missing_from_packages', () => {
   const eccRoot = makeTempDir('seli-ecc-');
   const projectRoot = makeTempDir('seli-missing-skill-');
@@ -713,6 +965,71 @@ test('team-skills scope doctor keeps team-layer checks', () => {
   expect(doctorResult.errors.join('\n')).toContain('Provider source root missing for ecc');
   expect(doctorResult.errors.join('\n')).toContain('Duplicate skill IDs found in both .codex/skills and .agents/skills');
   expect(doctorResult.errors.join('\n')).not.toContain('Claude skill entrypoint mismatch');
+});
+
+test('doctor fails when managed full-scope paths are gitignored', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-doctor-gitignore-full-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+  initGitRepo(projectRoot);
+  writeText(path.join(projectRoot, '.gitignore'), 'AGENTS.md\n.codex/\n');
+
+  const doctorResult = runDoctor({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  expect(doctorResult.ok).toBe(false);
+  expect(doctorResult.errors.join('\n')).toContain('Managed path is ignored by Git: AGENTS.md');
+  expect(doctorResult.errors.join('\n')).toContain('Managed path is ignored by Git: .codex/skills/repo-governance/SKILL.md');
+});
+
+test('doctor fails when managed team-scope paths are gitignored', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-doctor-gitignore-team-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+  initGitRepo(projectRoot);
+  writeText(path.join(projectRoot, '.gitignore'), '.agents/skills/\n');
+
+  const doctorResult = runDoctor({
+    projectRoot,
+    providerRoots: { ecc: eccRoot },
+    scope: 'team-skills'
+  });
+
+  expect(doctorResult.ok).toBe(false);
+  expect(doctorResult.errors.join('\n')).toContain('Managed path is ignored by Git: .agents/skills/tdd-workflow');
+  expect(doctorResult.errors.join('\n')).not.toContain('Managed path is ignored by Git: AGENTS.md');
+});
+
+test('doctor skips ignored-path check outside git worktrees', () => {
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-doctor-no-git-');
+  createFakeEccSource(eccRoot);
+
+  initProject({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+  writeText(path.join(projectRoot, '.gitignore'), 'AGENTS.md\n.codex/\n');
+
+  const doctorResult = runDoctor({
+    projectRoot,
+    providerRoots: { ecc: eccRoot }
+  });
+
+  expect(doctorResult.ok).toBe(true);
+  expect(doctorResult.info.join('\n')).toContain('Skipped ignored-path validation because the target is not a Git worktree.');
 });
 
 test('team-skills scope requires onboarded project and cannot be used with init', () => {

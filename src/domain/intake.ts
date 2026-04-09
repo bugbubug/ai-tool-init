@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import type {
   AgentIntakeManifestV2,
+  IntakePathBaseV2,
   IntakeDecisionV2,
   IntakeDocumentV2,
   IntakeProviderInputV2,
@@ -14,22 +15,47 @@ function hasOwn(value: object | undefined, key: string): boolean {
   return Boolean(value) && Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function normalizeDocument(document: IntakeDocumentV2, baseDir: string, index: number): IntakeDocumentV2 {
+function resolveIntakePath(
+  itemPath: string,
+  pathBase: IntakePathBaseV2 | undefined,
+  manifestDir: string,
+  projectRoot: string | undefined
+): string {
+  const effectiveBase =
+    pathBase === 'manifest' ? manifestDir : (projectRoot ?? manifestDir);
+  return path.resolve(effectiveBase, itemPath);
+}
+
+function normalizeDocument(
+  document: IntakeDocumentV2,
+  manifestDir: string,
+  projectRoot: string | undefined,
+  index: number
+): IntakeDocumentV2 {
   return {
     id: document.id || `doc-${index + 1}`,
-    path: path.resolve(baseDir, document.path),
+    path: resolveIntakePath(document.path, document.pathBase, manifestDir, projectRoot),
+    pathBase: document.pathBase,
     label: document.label,
     kind: document.kind,
     appliesTo: document.appliesTo
   };
 }
 
-function normalizeDecision(decision: IntakeDecisionV2, baseDir: string, index: number): IntakeDecisionV2 {
+function normalizeDecision(
+  decision: IntakeDecisionV2,
+  manifestDir: string,
+  projectRoot: string | undefined,
+  index: number
+): IntakeDecisionV2 {
   return {
     id: decision.id || `decision-${index + 1}`,
     summary: decision.summary,
     appliesTo: decision.appliesTo,
-    sourcePaths: uniqueStrings(decision.sourcePaths).map(item => path.resolve(baseDir, item))
+    pathBase: decision.pathBase,
+    sourcePaths: uniqueStrings(decision.sourcePaths).map(item =>
+      resolveIntakePath(item, decision.pathBase, manifestDir, projectRoot)
+    )
   };
 }
 
@@ -54,18 +80,23 @@ function normalizeProviders(providers: IntakeProviderInputV2[] | undefined, base
 }
 
 export function normalizeIntakeV2(input: AgentIntakeManifestV2, baseDir: string): AgentIntakeManifestV2 {
+  const projectPath = input.target?.projectPath ? path.resolve(baseDir, input.target.projectPath) : undefined;
   const normalizedProject = input.project
     ? {
+        summary: hasOwn(input.project, 'summary') ? input.project.summary?.trim() || undefined : undefined,
         requestedProjectSkills: hasOwn(input.project, 'requestedProjectSkills')
           ? uniqueStrings(input.project.requestedProjectSkills)
           : undefined,
         projectSkillBlueprints: hasOwn(input.project, 'projectSkillBlueprints')
           ? (input.project.projectSkillBlueprints ?? []).map(item => ({
               ...item,
+              pathBase: item.pathBase,
               guardrails: uniqueStrings(item.guardrails),
               relatedTeamSkills: uniqueStrings(item.relatedTeamSkills),
               sourceDocumentLabels: uniqueStrings(item.sourceDocumentLabels),
-              sourcePaths: uniqueStrings(item.sourcePaths).map(sourcePath => path.resolve(baseDir, sourcePath)),
+              sourcePaths: uniqueStrings(item.sourcePaths).map(sourcePath =>
+                resolveIntakePath(sourcePath, item.pathBase, baseDir, projectPath)
+              ),
               whenToUse: uniqueStrings(item.whenToUse),
               workflow: uniqueStrings(item.workflow)
             }))
@@ -77,13 +108,15 @@ export function normalizeIntakeV2(input: AgentIntakeManifestV2, baseDir: string)
   return {
     schemaVersion: 2,
     target: {
-      projectPath: input.target?.projectPath ? path.resolve(baseDir, input.target.projectPath) : undefined,
+      projectPath,
       requestedOperation: input.target?.requestedOperation,
       profile: input.target?.profile
     },
     providers: normalizeProviders(input.providers, baseDir),
-    documents: (input.documents ?? []).map((document, index) => normalizeDocument(document, baseDir, index)),
-    decisions: (input.decisions ?? []).map((decision, index) => normalizeDecision(decision, baseDir, index)),
+    documents: (input.documents ?? []).map((document, index) => normalizeDocument(document, baseDir, projectPath, index)),
+    decisions: (input.decisions ?? []).map((decision, index) =>
+      normalizeDecision(decision, baseDir, projectPath, index)
+    ),
     project: normalizedProject,
     notes: uniqueStrings(input.notes)
   };

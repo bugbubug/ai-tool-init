@@ -12,6 +12,7 @@ import { managedStateDoctorPlugin } from '../plugins/doctor-managed-state.js';
 import { providerStateDoctorPlugin } from '../plugins/doctor-provider-state.js';
 import { claudeEntrypointDoctorPlugin } from '../plugins/doctor-claude-entrypoint.js';
 import { duplicateSkillsDoctorPlugin } from '../plugins/doctor-duplicate-skills.js';
+import { ignoredManagedPathsDoctorPlugin } from '../plugins/doctor-ignored-managed-paths.js';
 
 export function createDefaultProviderRegistry(): ProviderRegistry {
   const registry = new ProviderRegistry();
@@ -40,5 +41,6 @@ export function createDefaultDoctorRegistry(): DoctorRegistry {
   registry.register(providerStateDoctorPlugin);
   registry.register(claudeEntrypointDoctorPlugin);
   registry.register(duplicateSkillsDoctorPlugin);
+  registry.register(ignoredManagedPathsDoctorPlugin);
   return registry;
 }
