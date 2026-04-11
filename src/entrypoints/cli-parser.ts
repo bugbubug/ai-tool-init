@@ -16,6 +16,11 @@ Usage:
   seli plugins list [--json|--explain]
   seli inspect plan --project <abs-path> [--intake intake/manifest.json] [--scope full|team-skills] [--json|--explain]
   seli inspect config --project <abs-path> [--intake intake/manifest.json] [--scope full|team-skills] [--json|--explain]
+
+Defaults:
+  init defaults to --scope full.
+  On already-onboarded projects, plan/update/doctor/inspect default to --scope team-skills.
+  Use --scope full to refresh AGENTS.md, .claude, and .codex baselines.
 `;
 }
 
@@ -43,7 +48,6 @@ export function parseCliArgs(argv: string[]): ParsedCliOptionsV2 {
     intakePath: null,
     outputMode: 'explain',
     providerRoots: {},
-    scope: 'full',
     profileId: 'default',
     projectRoot: null
   };

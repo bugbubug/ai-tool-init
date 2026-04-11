@@ -9,8 +9,7 @@ function withDefaults(options: ProjectCommandOptionsV2): ProjectCommandOptionsV2
   return {
     ...options,
     profileId: options.profileId || 'default',
-    providerRoots: options.providerRoots || {},
-    scope: options.scope || 'full'
+    providerRoots: options.providerRoots || {}
   };
 }
 

@@ -24,6 +24,7 @@ export const inspectConfigCommandModule: CommandModule = {
     );
 
     return {
+      scope: plan.scope,
       config: plan.config,
       resolvedProviders: plan.resolved.providers.map(provider => ({
         id: provider.id,

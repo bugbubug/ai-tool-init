@@ -21,7 +21,7 @@ import { CONFIG_RELATIVE_PATH_V2, LOCK_RELATIVE_PATH_V2, normalizeConfigV2 } fro
 import { applyIntakeAndPolicy } from '../domain/config-merge.js';
 import { loadAndNormalizeIntake, resolveRequestedOperation } from '../domain/intake.js';
 import { isLocalFileCustomization, prepareDesiredEntryForCustomization } from '../domain/managed-customization.js';
-import { filterEntriesByScope, isEntryInScope, normalizeInstallScope } from '../domain/scope.js';
+import { filterEntriesByScope, isEntryInScope, resolveInstallScope } from '../domain/scope.js';
 import {
   createBootstrapConfigV2,
   detectLegacyState,
@@ -254,7 +254,6 @@ function buildRegistrySnapshot(config: SeliConfigV2, env: RuntimeEnvironment): S
 
 export function createPlanV2(command: InstallCommand, options: ProjectCommandOptionsV2, env: RuntimeEnvironment): InstallPlanV2 {
   const projectRoot = path.resolve(options.projectRoot);
-  const scope = normalizeInstallScope(options.scope);
   if (hasUnsupportedLegacyState(projectRoot)) {
     throw new Error(
       `Unsupported legacy state detected under ${projectRoot}. Remove .ai-tool-init/, .aitoolinit.json, and .seli before running seli.`
@@ -277,6 +276,7 @@ export function createPlanV2(command: InstallCommand, options: ProjectCommandOpt
   );
   const bootstrapProfile = intake?.target?.profile || options.profileId || 'default';
   const existingLock = loadExistingLockV2(projectRoot);
+  const scope = resolveInstallScope(command, options.scope, Boolean(existingConfig), Boolean(existingLock));
 
   if (command === 'init' && scope === 'team-skills') {
     throw new Error('init does not support --scope team-skills. Run a full init first.');

@@ -82,27 +82,6 @@ function writeIntakeV2(rootPath: string, manifest: AgentIntakeManifestV2): strin
   return intakePath;
 }
 
-function sectionBullets(content: string, title: string): string[] {
-  const lines = content.split('\n');
-  const header = `## ${title}`;
-  const startIndex = lines.indexOf(header);
-  if (startIndex < 0) {
-    return [];
-  }
-
-  const bullets: string[] = [];
-  for (let index = startIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index] ?? '';
-    if (line.startsWith('## ')) {
-      break;
-    }
-    if (line.startsWith('- ')) {
-      bullets.push(line);
-    }
-  }
-  return bullets;
-}
-
 test('init writes only .selirc/.seli.lock and no compat outputs', () => {
   const eccRoot = makeTempDir('seli-ecc-');
   const projectRoot = makeTempDir('seli-project-');
@@ -145,14 +124,13 @@ test('init writes only .selirc/.seli.lock and no compat outputs', () => {
   expect(skillTeam).toContain('本项目由 Seli 初始化，请参考本地技能包进行代码生成。');
 
   const agentsContract = fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8');
-  expect(agentsContract).toContain('## Project Context');
-  expect(agentsContract).toContain('## Response Principles');
-  expect(agentsContract).toContain('## Layer Priority');
+  expect(agentsContract).toContain('## Project Summary');
   expect(agentsContract).toContain('## Guardrails');
-  expect(agentsContract).toContain(
-    'Do not assume this repository is the seli source repository unless repository evidence confirms it.'
-  );
+  expect(agentsContract).toContain('Use repository files, configs, and local skills as the source of truth.');
   expect(agentsContract).not.toContain('## Agent First-Question Protocol');
+  expect(agentsContract).not.toContain('## Project Context');
+  expect(agentsContract).not.toContain('## Response Principles');
+  expect(agentsContract).not.toContain('## Layer Priority');
   expect(agentsContract).not.toContain('1. `项目特点`');
   expect(agentsContract).not.toContain('## Update Workflow');
   expect(agentsContract).not.toContain('## Tech Stack Guidance');
@@ -178,7 +156,7 @@ test('init writes only .selirc/.seli.lock and no compat outputs', () => {
   }
 });
 
-test('AGENTS includes project-skill blueprint context', () => {
+test('AGENTS does not derive summary from project-skill blueprints', () => {
   const eccRoot = makeTempDir('seli-ecc-');
   const projectRoot = makeTempDir('seli-blueprint-project-');
   const intakeRoot = makeTempDir('seli-blueprint-intake-');
@@ -205,34 +183,34 @@ test('AGENTS includes project-skill blueprint context', () => {
   initProject({ projectRoot, intakePath });
 
   const agentsContract = fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8');
-  expect(agentsContract).toContain('Optimize onboarding and paywall conversion for India MVP.');
-  expect(agentsContract).toContain('When funnel drop-off or onboarding copy changes are requested.');
-  expect(agentsContract).toContain('Read product docs and analytics notes before proposing funnel changes.');
-  expect(agentsContract).toContain('Refer to project documents: India MVP PRD.');
+  expect(agentsContract).toContain('## Project Summary');
+  expect(agentsContract).toContain('No project summary configured. Add `project.summary` in intake to describe this repository.');
+  expect(agentsContract).not.toContain('Optimize onboarding and paywall conversion for India MVP.');
+  expect(agentsContract).not.toContain('When funnel drop-off or onboarding copy changes are requested.');
+  expect(agentsContract).not.toContain('Read product docs and analytics notes before proposing funnel changes.');
+  expect(agentsContract).not.toContain('India MVP PRD');
   expect(agentsContract).not.toContain('Team skill context:');
   expect(agentsContract).not.toContain('## Agent First-Question Protocol');
 });
 
-test('AGENTS keeps concise bullet and length limits', () => {
+test('AGENTS summary uses explicit project summary only', () => {
   const eccRoot = makeTempDir('seli-ecc-');
-  const projectRoot = makeTempDir('seli-compact-project-');
-  const intakeRoot = makeTempDir('seli-compact-intake-');
+  const projectRoot = makeTempDir('seli-summary-only-project-');
+  const intakeRoot = makeTempDir('seli-summary-only-intake-');
   createFakeEccSource(eccRoot);
-
-  const longLine =
-    'This is a very long project guidance sentence meant to verify AGENTS truncation behavior keeps output concise even when upstream project blueprints include overly verbose descriptions and workflows that would otherwise flood the contract.';
 
   const intakePath = writeIntakeV2(intakeRoot, {
     schemaVersion: 2,
     target: { projectPath: projectRoot, requestedOperation: 'auto' },
     providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['frontend-patterns', 'backend-patterns'] }],
     project: {
+      summary: 'Growth repo for onboarding, activation, and payment completion flows.',
       projectSkillBlueprints: [
         {
           id: 'growth-funnel',
-          description: longLine,
-          whenToUse: [longLine, 'Handle conversion experiments.'],
-          workflow: [longLine, 'Review latest product constraints first.'],
+          description: 'Blueprint detail that should stay in project skills, not AGENTS.',
+          whenToUse: ['Handle conversion experiments.'],
+          workflow: ['Review latest product constraints first.'],
           sourceDocumentLabels: ['Growth Spec', 'KPI Tracker', 'Launch Checklist', 'Experiment Notes']
         },
         {
@@ -247,16 +225,12 @@ test('AGENTS keeps concise bullet and length limits', () => {
   initProject({ projectRoot, intakePath });
 
   const agentsContract = fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8');
-  const contextBullets = sectionBullets(agentsContract, 'Project Context');
-  const principlesBullets = sectionBullets(agentsContract, 'Response Principles');
-
-  expect(contextBullets.length).toBeLessThanOrEqual(3);
-  expect(principlesBullets.length).toBeLessThanOrEqual(4);
-  for (const bullet of [...contextBullets, ...principlesBullets]) {
-    expect(bullet.length).toBeLessThanOrEqual(145);
-  }
-  expect(agentsContract).not.toContain('Team skill context:');
-  expect(agentsContract).not.toContain('## Tech Stack Guidance');
+  expect(agentsContract).toContain('Growth repo for onboarding, activation, and payment completion flows.');
+  expect(agentsContract).not.toContain('Blueprint detail that should stay in project skills, not AGENTS.');
+  expect(agentsContract).not.toContain('Handle conversion experiments.');
+  expect(agentsContract).not.toContain('Review latest product constraints first.');
+  expect(agentsContract).not.toContain('Growth Spec');
+  expect(agentsContract).not.toContain('Keep payment copy and rules aligned with market constraints.');
 });
 
 test('required project skill blueprints override defaults on init', () => {
@@ -490,11 +464,13 @@ test('update rewrites legacy AGENTS first-question block', () => {
     'utf8'
   );
 
-  updateProject({ projectRoot, intakePath, force: true });
+  updateProject({ projectRoot, intakePath, scope: 'full', force: true });
 
   const agentsContract = fs.readFileSync(path.join(projectRoot, 'AGENTS.md'), 'utf8');
-  expect(agentsContract).toContain('## Project Context');
-  expect(agentsContract).toContain('## Response Principles');
+  expect(agentsContract).toContain('## Project Summary');
+  expect(agentsContract).toContain('## Guardrails');
+  expect(agentsContract).not.toContain('## Project Context');
+  expect(agentsContract).not.toContain('## Response Principles');
   expect(agentsContract).not.toContain('## Tech Stack Guidance');
   expect(agentsContract).not.toContain('## Agent First-Question Protocol');
   expect(agentsContract).not.toContain('1. `项目特点`');
@@ -857,6 +833,7 @@ test('full update preserves custom-block content and local-file overrides', () =
   const result = updateProject({
     projectRoot,
     providerRoots: { ecc: eccRoot },
+    scope: 'full',
     force: true
   });
 
@@ -908,7 +885,8 @@ test('team-skills scope ignores non-team managed drift during update and doctor'
   expect(() =>
     updateProject({
       projectRoot,
-      intakePath: updatedIntakePath
+      intakePath: updatedIntakePath,
+      scope: 'full'
     })
   ).toThrow(/Managed file drift detected/);
 
@@ -929,7 +907,8 @@ test('team-skills scope ignores non-team managed drift during update and doctor'
 
   const fullDoctor = runDoctor({
     projectRoot,
-    intakePath: updatedIntakePath
+    intakePath: updatedIntakePath,
+    scope: 'full'
   });
   expect(fullDoctor.ok).toBe(false);
   expect(fullDoctor.errors.join('\n')).toContain('Claude skill entrypoint mismatch');
@@ -981,7 +960,8 @@ test('doctor fails when managed full-scope paths are gitignored', () => {
 
   const doctorResult = runDoctor({
     projectRoot,
-    providerRoots: { ecc: eccRoot }
+    providerRoots: { ecc: eccRoot },
+    scope: 'full'
   });
 
   expect(doctorResult.ok).toBe(false);
@@ -1025,7 +1005,8 @@ test('doctor skips ignored-path check outside git worktrees', () => {
 
   const doctorResult = runDoctor({
     projectRoot,
-    providerRoots: { ecc: eccRoot }
+    providerRoots: { ecc: eccRoot },
+    scope: 'full'
   });
 
   expect(doctorResult.ok).toBe(true);
@@ -1133,6 +1114,61 @@ test('CLI inspect plan supports --scope team-skills', () => {
     { action: 'write-symlink', path: '.agents/skills/security-review' },
     { action: 'write-file', path: '.seli.lock' }
   ]);
+});
+
+test('onboarded plan, update, doctor, and inspect default to team-skills scope', () => {
+  const repoRoot = path.join(import.meta.dir, '..');
+  const cliPath = path.join(repoRoot, 'src', 'cli.ts');
+  const eccRoot = makeTempDir('seli-ecc-');
+  const projectRoot = makeTempDir('seli-default-scope-');
+  const intakeRoot = makeTempDir('seli-default-scope-intake-');
+  createFakeEccSource(eccRoot);
+
+  const initialIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow'] }]
+  });
+  initProject({ projectRoot, intakePath: initialIntakePath });
+
+  const updatedIntakePath = writeIntakeV2(intakeRoot, {
+    schemaVersion: 2,
+    target: { projectPath: projectRoot, requestedOperation: 'auto' },
+    providers: [{ providerId: 'ecc', rootPath: eccRoot, requestedSkills: ['tdd-workflow', 'security-review'] }]
+  });
+
+  const plan = planProject({ projectRoot, intakePath: updatedIntakePath });
+  expect(plan.scope).toBe('team-skills');
+  expect(plan.operations.map(operation => operation.path)).toEqual(['.selirc', '.agents/skills/security-review', '.seli.lock']);
+
+  const update = updateProject({ projectRoot, intakePath: updatedIntakePath });
+  expect(update.plan.scope).toBe('team-skills');
+  expect(fs.lstatSync(path.join(projectRoot, '.agents', 'skills', 'security-review')).isSymbolicLink()).toBe(true);
+
+  const doctor = runDoctor({ projectRoot, intakePath: updatedIntakePath });
+  expect(doctor.ok).toBe(true);
+
+  const inspectPlanJson = execFileSync(
+    process.execPath,
+    [cliPath, 'inspect', 'plan', '--project', projectRoot, '--intake', updatedIntakePath, '--json'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8'
+    }
+  );
+  const inspectPlan = JSON.parse(inspectPlanJson) as { scope: string };
+  expect(inspectPlan.scope).toBe('team-skills');
+
+  const inspectConfigJson = execFileSync(
+    process.execPath,
+    [cliPath, 'inspect', 'config', '--project', projectRoot, '--intake', updatedIntakePath, '--json'],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8'
+    }
+  );
+  const inspectConfig = JSON.parse(inspectConfigJson) as { scope?: string };
+  expect(inspectConfig.scope).toBe('team-skills');
 });
 
 test('CLI explain mode prints Seli banner and init status lines', () => {

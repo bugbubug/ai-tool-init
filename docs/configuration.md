@@ -36,7 +36,7 @@ Provider roots remain manifest-relative:
 - `providers[].rootPath`
 - `providers[].teamPackages[].rootPath`
 
-`project.summary` is optional and feeds the generated `AGENTS.md` project context.
+`project.summary` is optional and feeds the generated `AGENTS.md` Project Summary section.
 
 Template location:
 

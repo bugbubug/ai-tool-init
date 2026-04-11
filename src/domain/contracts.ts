@@ -401,7 +401,7 @@ export interface ParsedCliOptionsV2 {
   profileId: string;
   intakePath: string | null;
   providerRoots: ProviderRootMap;
-  scope: InstallScope;
+  scope?: InstallScope | undefined;
   force: boolean;
   outputMode: CliOutputMode;
 }

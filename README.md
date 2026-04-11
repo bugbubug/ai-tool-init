@@ -85,7 +85,15 @@ seli plan --project /absolute/path/to/your-project
 seli update --project /absolute/path/to/your-project
 ```
 
-仅同步 team skills 时使用受限范围：
+对于已经接入过 seli 的仓库，上面两条命令默认只刷新 team skills 范围。
+如果要重刷 `AGENTS.md`、`.claude`、`.codex` 等完整协作基线，显式传 `--scope full`：
+
+```bash
+seli plan --project /absolute/path/to/your-project --scope full
+seli update --project /absolute/path/to/your-project --scope full
+```
+
+显式指定最小范围时：
 
 ```bash
 seli plan --project /absolute/path/to/your-project --scope team-skills
@@ -128,7 +136,9 @@ provider root 解析优先级（高到低）：
 
 scope 说明：
 
-- `full`：默认完整治理，会刷新全部托管基线文件与 team skill 挂载。
+- `init`：默认使用 `full`，完成完整初始化。
+- 已接入仓库上的 `plan` / `update` / `doctor` / `inspect`：默认使用 `team-skills`，只做最小范围刷新。
+- `full`：刷新全部托管基线文件与 team skill 挂载。
 - `team-skills`：仅刷新 `.agents/skills/<skillId>` 软链接，以及 `.selirc` / `.seli.lock`。
 - `team-skills` 只适用于已接入过 seli 且同时存在 `.selirc` 和 `.seli.lock` 的仓库。
 
@@ -152,7 +162,7 @@ intake 路径解析规则：
 - 如果 `target.projectPath` 缺失，上述项目内路径会回退为相对 intake 文件目录解析。
 - 如需强制相对 intake 文件目录解析，可在对应条目上设置 `"pathBase": "manifest"`。
 
-`project.summary` 会进入生成的 `AGENTS.md` 的 `Project Context`，适合写简短项目背景；不要把操作步骤写进这里。
+`project.summary` 会进入生成的 `AGENTS.md` 的 `Project Summary`，适合写简短项目背景；不要把操作步骤写进这里。
 
 ## 开发说明 / Development
 
@@ -188,13 +198,21 @@ bun run typecheck && bun test
 ### `init` 和 `update` 的区别？
 
 - `init`：面向首次接入或引导初始化。
-- `update`：面向已有状态的增量刷新。
+- `update`：面向已有状态的增量刷新；默认只更新 team skills 与状态文件。
 
-两者都会先经由计划阶段计算操作，再落地文件变更。
+两者都会先经由计划阶段计算操作，再落地文件变更。需要完整刷新协作基线时，对 `update` 显式加 `--scope full`。
+
+### 为什么 `update` 默认不再刷新 AGENTS/Claude 基线？
+
+为了把日常维护收敛成最小扰动。
+
+- 默认 `update` 只刷新 `.agents/skills/<skillId>` 软链接以及 `.selirc` / `.seli.lock`。
+- 这能减少对 `AGENTS.md`、`.claude`、`.codex` 的非必要改动。
+- 需要重刷完整协作基线时，显式使用 `--scope full`。
 
 ### 如何只新增或同步 team skills，而不改 AGENTS/Claude 基线？
 
-使用 `team-skills` scope：
+已接入仓库默认就是这个行为；如果要显式声明，使用 `team-skills` scope：
 
 ```bash
 seli update --project /abs/path --scope team-skills

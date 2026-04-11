@@ -1,9 +1,22 @@
-import type { DesiredEntry, InstallScope, ManagedEntryV2 } from './contracts.js';
+import type { DesiredEntry, InstallCommand, InstallScope, ManagedEntryV2 } from './contracts.js';
 
 type ScopedEntry = Pick<DesiredEntry, 'path'> | Pick<ManagedEntryV2, 'path'>;
 
-export function normalizeInstallScope(scope: InstallScope | undefined): InstallScope {
-  return scope ?? 'full';
+export function resolveInstallScope(
+  command: InstallCommand,
+  scope: InstallScope | undefined,
+  hasExistingConfig: boolean,
+  hasExistingLock: boolean
+): InstallScope {
+  if (scope) {
+    return scope;
+  }
+
+  if (command === 'init') {
+    return 'full';
+  }
+
+  return hasExistingConfig && hasExistingLock ? 'team-skills' : 'full';
 }
 
 export function isTeamSkillPath(path: string): boolean {
